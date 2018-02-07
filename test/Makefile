@@ -10,7 +10,7 @@ CFLAGS ?= -O2 -Wall -Wextra -Wno-unused-parameter
 CFLAGS += -std=c99 -D_GNU_SOURCE
 
 SRC=$(wildcard *.c)
-BIN=$(SRC:.test=.o)
+BIN=$(SRC:.c=.test)
 
 .PHONY: all clean
 

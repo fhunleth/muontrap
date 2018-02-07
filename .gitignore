@@ -25,3 +25,5 @@ shimmy-*.tar
 /priv
 
 *.o
+shimmy-debug.log
+test/*.test

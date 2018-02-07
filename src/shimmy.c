@@ -21,6 +21,9 @@ static FILE *debugfp = NULL;
 #define INFO(MSG, ...) ;
 #endif
 
+// asprintf can fail, but it's so rare that it's annoying to see the checks in the code.
+#define checked_asprintf(MSG, ...) do { if (asprintf(MSG, ## __VA_ARGS__) < 0) err(EXIT_FAILURE, "asprintf"); } while (0)
+
 static struct option long_options[] = {
     {"controller", required_argument, 0, 'c'},
     {"help",     no_argument,       0, 'h'},
@@ -175,7 +178,7 @@ static void update_cgroup_settings()
              var != NULL;
              var = var->next) {
             char *setting_file;
-            asprintf(&setting_file, "%s/%s", controller->path, var->key);
+            checked_asprintf(&setting_file, "%s/%s", controller->path, var->key);
             if (write_file(setting_file, var->value) < 0)
                 err(EXIT_FAILURE, "Error writing '%s' to '%s'", var->value, setting_file);
             free(setting_file);
@@ -242,8 +245,8 @@ static void kill_children(int sig)
 static void finish_controller_init()
 {
     FOREACH_CONTROLLER {
-        asprintf(&controller->path, "%s/%s/%s", CGROUP_MOUNT_PATH, controller->name, cgroup_path);
-        asprintf(&controller->procfile, "%s/cgroup.procs", controller->path);
+        checked_asprintf(&controller->path, "%s/%s/%s", CGROUP_MOUNT_PATH, controller->name, cgroup_path);
+        checked_asprintf(&controller->procfile, "%s/cgroup.procs", controller->path);
     }
 }
 
@@ -288,6 +291,19 @@ static void cleanup()
     destroy_cgroups();
 
     INFO("cleanup done\n");
+}
+
+static void kill_child_nicely(pid_t child)
+{
+    // Start with SIGTERM
+    kill(child, SIGTERM);
+
+    // Wait a little.
+    if (brutal_kill_wait_us > 0)
+        usleep(brutal_kill_wait_us);
+
+    // Brutal kill
+    kill(child, SIGKILL);
 }
 
 static struct controller_info *add_controller(const char *name)
@@ -449,12 +465,12 @@ int main(int argc, char *argv[])
 
         if (fds[0].revents) {
             INFO("stdin closed. cleaning up...");
-            kill(pid, SIGTERM);
+            kill_child_nicely(pid);
             break;
         }
         if (fds[2].revents) {
             INFO("stdout closed. cleaning up...");
-            kill(pid, SIGTERM);
+            kill_child_nicely(pid);
             break;
         }
         if (fds[1].revents) {

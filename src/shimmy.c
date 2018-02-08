@@ -452,11 +452,11 @@ int main(int argc, char *argv[])
     pid_t pid = fork_exec(argv[optind], &argv[optind]);
     struct pollfd fds[3];
     fds[0].fd = STDIN_FILENO;
-    fds[0].events = 0; // POLLERR is implicit
+    fds[0].events = POLLHUP; // POLLERR is implicit
     fds[1].fd = signal_pipe[0];
     fds[1].events = POLLIN;
     fds[2].fd = STDOUT_FILENO;
-    fds[2].events = 0; // POLLERR is implicit
+    fds[2].events = POLLHUP; // POLLERR is implicit
 
     for (;;) {
         if (poll(fds, 2, -1) < 0) {

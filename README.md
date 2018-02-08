@@ -24,6 +24,7 @@ def deps do
     {:shimmy, "~> 0.1.0"}
   ]
 end
+```
 
 ## The problem
 

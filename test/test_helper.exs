@@ -48,6 +48,6 @@ case :os.type() do
   {:unix, :linux} ->
     ShimmyTestHelpers.check_cgroup_support()
   _ ->
-    IO.puts(:stderr, "Skipping tests that use cgroups...")
+    IO.puts(:stderr, "Not on Linux so skipping tests that use cgroups...")
     ExUnit.configure(exclude: :cgroup)
 end

@@ -146,10 +146,9 @@ static int mkdir_p(const char *abspath, int start_index)
 
 static void create_cgroups()
 {
-    INFO("create cgroups\n");
     FOREACH_CONTROLLER {
         int start_index = strlen(CGROUP_MOUNT_PATH) + 1 + strlen(controller->name) + 1;
-        INFO("mkdir -p %s\n", controller->path);
+        INFO("Create cgroup: mkdir -p %s\n", controller->path);
         if (mkdir_p(controller->path, start_index) < 0) {
             if (errno == EEXIST)
                 errx(EXIT_FAILURE, "'%s' already exists. Please specify a deeper path or clean up the cgroup",

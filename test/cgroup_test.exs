@@ -2,6 +2,7 @@ defmodule CgroupTest do
   use ExUnit.Case
   import ShimmyTestHelpers
 
+  @tag :cgroup
   test "cgroup gets created and removed on exit" do
     cgroup_path = random_cgroup_path()
     port = Port.open({:spawn_executable, shimmy_path()},
@@ -16,6 +17,7 @@ defmodule CgroupTest do
     assert !cpu_cgroup_exists(cgroup_path)
   end
 
+  @tag :cgroup
   test "cleans up after a forking process" do
     cgroup_path = random_cgroup_path()
     port = Port.open({:spawn_executable, shimmy_path()},

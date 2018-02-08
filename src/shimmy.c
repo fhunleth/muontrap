@@ -13,7 +13,6 @@
 #include <pwd.h>
 #include <grp.h>
 
-#define DEBUG
 #ifdef DEBUG
 static FILE *debugfp = NULL;
 #define INFO(MSG, ...) do { fprintf(debugfp, MSG, ## __VA_ARGS__); fflush(debugfp); } while (0)

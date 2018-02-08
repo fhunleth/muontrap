@@ -1,20 +1,8 @@
 defmodule ShimmyTest do
   use ExUnit.Case
+  import ShimmyTestHelpers
+
   doctest Shimmy
-
-  defp is_os_pid_around?(os_pid) do
-    {_, rc} = System.cmd("ps", ["-p", "#{os_pid}"])
-    rc == 0
-  end
-
-  defp os_pid(port) do
-    {:os_pid, os_pid} = Port.info(port, :os_pid)
-    os_pid
-  end
-
-  defp shimmy_path() do
-    Application.app_dir(:shimmy, "priv/shimmy")
-  end
 
   test "closing the port kills the process" do
     port = Port.open({:spawn_executable, shimmy_path()},
@@ -51,7 +39,4 @@ defmodule ShimmyTest do
 
     assert !is_os_pid_around?(os_pid)
   end
-
-
-
 end

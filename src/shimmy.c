@@ -269,23 +269,27 @@ static void cleanup()
     sigaction(SIGQUIT, NULL, NULL);
     sigaction(SIGTERM, NULL, NULL);
 
-    // Kill children "nicely"
-    kill_children(SIGTERM);
-
-    // Wait a little.
-    if (brutal_kill_wait_us > 0)
-        usleep(brutal_kill_wait_us);
-
-    // Kill children not so nicely and repeatedly in case
-    // we have some respawners.
-    int retries = 5;
+    // If the subprocess responded to our SIGTERM, then hopefully
+    // nothing exists, but if subprocesses do exist, repeatedly
+    // kill them until they all go away.
+    int retries = 10;
     while (retries > 0 && child_processes_exist()) {
         kill_children(SIGKILL);
+        usleep(1000);
         retries--;
     }
 
-    if (retries == 0)
-        warnx("Failed to kill all children even after retrying!");
+    if (retries == 0) {
+        // Hammer the child processes as a final attempt (no waiting this time)
+        retries = 10;
+        while (retries > 0 && child_processes_exist()) {
+            kill_children(SIGKILL);
+            retries--;
+        }
+
+        if (retries == 0)
+            warnx("Failed to kill all children even after retrying!");
+    }
 
     // Clean up our cgroup
     destroy_cgroups();

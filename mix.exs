@@ -46,5 +46,4 @@ defmodule Shimmy.MixProject do
       links: %{"GitHub" => "https://github.com/fhunleth/shimmy"}
     ]
   end
-
 end

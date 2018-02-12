@@ -1,7 +1,6 @@
 ExUnit.start()
 
 defmodule ShimmyTestHelpers do
-
   def cpu_cgroup_exists(path) do
     {rc, 0} = System.cmd("cgget", ["-g", "cpu", path], stderr_to_stdout: true)
     String.match?(rc, ~r/cpu.shares/)
@@ -38,15 +37,12 @@ defmodule ShimmyTestHelpers do
     {:os_pid, os_pid} = Port.info(port, :os_pid)
     os_pid
   end
-
-  def shimmy_path() do
-    Application.app_dir(:shimmy, "priv/shimmy")
-  end
 end
 
 case :os.type() do
   {:unix, :linux} ->
     ShimmyTestHelpers.check_cgroup_support()
+
   _ ->
     IO.puts(:stderr, "Not on Linux so skipping tests that use cgroups...")
     ExUnit.configure(exclude: :cgroup)

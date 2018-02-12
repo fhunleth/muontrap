@@ -27,10 +27,10 @@ static struct option long_options[] = {
     {"controller", required_argument, 0, 'c'},
     {"help",     no_argument,       0, 'h'},
     {"delay-to-sigkill", required_argument, 0, 'k'},
-    {"path", required_argument, 0, 'p'},
+    {"group", required_argument, 0, 'g'},
     {"set", required_argument, 0, 's'},
     {"uid", required_argument, 0, 'u'},
-    {"gid", required_argument, 0, 'g'},
+    {"gid", required_argument, 0, 'a'},
     {0,          0,                 0, 0 }
 };
 
@@ -44,7 +44,7 @@ struct controller_var {
 
 struct controller_info {
     const char *name;
-    char *path;
+    char *group_path;
     char *procfile;
 
     struct controller_var *vars;
@@ -70,7 +70,7 @@ static void usage()
     printf("Options:\n");
 
     printf("--controller,-c <cgroup controller> (may be specified multiple times)\n");
-    printf("--path,-p <cgroup path>\n");
+    printf("--group,-g <cgroup path>\n");
     printf("--set,-s <cgroup variable>=<value>\n (may be specified multiple times)\n");
     printf("--delay-to-sigkill,-k <microseconds>\n");
     printf("--uid <uid/user> drop priviledge to this uid or user\n");
@@ -85,9 +85,9 @@ void sigchild_handler(int signum)
         warn("write(signal_pipe)");
 }
 
-static int fork_exec(const char *path, char *const *argv)
+static int fork_exec(const char *group_path, char *const *argv)
 {
-    INFO("Running %s\n", path);
+    INFO("Running %s\n", group_path);
     for (char *const *arg = argv; *arg != NULL; arg++) {
         INFO("  arg: %s\n", *arg);
     }
@@ -107,7 +107,7 @@ static int fork_exec(const char *path, char *const *argv)
         if (run_as_uid > 0 && setuid(run_as_uid) < 0)
             err(EXIT_FAILURE, "setuid(%d)", run_as_uid);
 
-        execvp(path, argv);
+        execvp(group_path, argv);
 
         // Not supposed to reach here.
         exit(EXIT_FAILURE);
@@ -121,21 +121,21 @@ static int mkdir_p(const char *abspath, int start_index)
 {
     int rc = 0;
     int last_errno = 0;
-    char *path = strdup(abspath);
+    char *group_path = strdup(abspath);
     for (int i = start_index; ; i++) {
-        if (path[i] == '/' || path[i] == 0) {
-            char save = path[i];
-            path[i] = 0;
-            rc = mkdir(path, 0755);
+        if (group_path[i] == '/' || group_path[i] == 0) {
+            char save = group_path[i];
+            group_path[i] = 0;
+            rc = mkdir(group_path, 0755);
             if (rc < 0)
                 last_errno = errno;
 
-            path[i] = save;
+            group_path[i] = save;
             if (save == 0)
                 break;
         }
     }
-    free(path);
+    free(group_path);
 
     // Return the last call to mkdir since that's the one that matters
     // and earlier directories are likely already created.
@@ -147,20 +147,20 @@ static void create_cgroups()
 {
     FOREACH_CONTROLLER {
         int start_index = strlen(CGROUP_MOUNT_PATH) + 1 + strlen(controller->name) + 1;
-        INFO("Create cgroup: mkdir -p %s\n", controller->path);
-        if (mkdir_p(controller->path, start_index) < 0) {
+        INFO("Create cgroup: mkdir -p %s\n", controller->group_path);
+        if (mkdir_p(controller->group_path, start_index) < 0) {
             if (errno == EEXIST)
-                errx(EXIT_FAILURE, "'%s' already exists. Please specify a deeper path or clean up the cgroup",
-                     controller->path);
+                errx(EXIT_FAILURE, "'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
+                     controller->group_path);
             else
-                err(EXIT_FAILURE, "Couldn't create '%s'. Check permissions.", controller->path);
+                err(EXIT_FAILURE, "Couldn't create '%s'. Check permissions.", controller->group_path);
         }
     }
 }
 
-static int write_file(const char *path, const char *value)
+static int write_file(const char *group_path, const char *value)
 {
-   FILE *fp = fopen(path, "w");
+   FILE *fp = fopen(group_path, "w");
    if (!fp)
        return -1;
 
@@ -176,7 +176,7 @@ static void update_cgroup_settings()
              var != NULL;
              var = var->next) {
             char *setting_file;
-            checked_asprintf(&setting_file, "%s/%s", controller->path, var->key);
+            checked_asprintf(&setting_file, "%s/%s", controller->group_path, var->key);
             if (write_file(setting_file, var->value) < 0)
                 err(EXIT_FAILURE, "Error writing '%s' to '%s'", var->value, setting_file);
             free(setting_file);
@@ -200,14 +200,14 @@ static void destroy_cgroups()
     FOREACH_CONTROLLER {
         // Only remove the final directory, since we don't keep track of
         // what we actually create.
-        INFO("rmdir %s\n", controller->path);
-        rmdir(controller->path);
+        INFO("rmdir %s\n", controller->group_path);
+        rmdir(controller->group_path);
     }
 }
 
-static void procfile_killall(const char *path, int sig)
+static void procfile_killall(const char *group_path, int sig)
 {
-    FILE *fp = fopen(path, "r");
+    FILE *fp = fopen(group_path, "r");
     if (!fp)
         return;
 
@@ -219,9 +219,9 @@ static void procfile_killall(const char *path, int sig)
     fclose(fp);
 }
 
-static int procfile_has_processes(const char *path)
+static int procfile_has_processes(const char *group_path)
 {
-    FILE *fp = fopen(path, "r");
+    FILE *fp = fopen(group_path, "r");
     if (!fp)
         return 0;
 
@@ -243,8 +243,8 @@ static void kill_children(int sig)
 static void finish_controller_init()
 {
     FOREACH_CONTROLLER {
-        checked_asprintf(&controller->path, "%s/%s/%s", CGROUP_MOUNT_PATH, controller->name, cgroup_path);
-        checked_asprintf(&controller->procfile, "%s/cgroup.procs", controller->path);
+        checked_asprintf(&controller->group_path, "%s/%s/%s", CGROUP_MOUNT_PATH, controller->name, cgroup_path);
+        checked_asprintf(&controller->procfile, "%s/cgroup.procs", controller->group_path);
     }
 }
 
@@ -312,7 +312,7 @@ static struct controller_info *add_controller(const char *name)
 {
     struct controller_info *new_controller = malloc(sizeof(struct controller_info));
     new_controller->name = name;
-    new_controller->path = NULL;
+    new_controller->group_path = NULL;
     new_controller->vars = NULL;
     new_controller->next = controllers;
     controllers = new_controller;
@@ -345,9 +345,9 @@ int main(int argc, char *argv[])
     struct controller_info *current_controller = NULL;
     while ((opt = getopt_long(argc, argv, "c:hp:s:", long_options, NULL)) != -1) {
         switch (opt) {
-        case 'p':
+        case 'g':
             if (cgroup_path)
-                errx(EXIT_FAILURE, "Only one cgroup path supported.");
+                errx(EXIT_FAILURE, "Only one cgroup group_path supported.");
             cgroup_path = optarg;
             break;
 
@@ -377,7 +377,7 @@ int main(int argc, char *argv[])
                 errx(EXIT_FAILURE, "Delay to sending a SIGKILL must be < 1,000,000 (1 second)");
             break;
 
-        case 'g': // --gid
+        case 'a': // --gid
         {
             char *endptr;
             run_as_gid = strtoul(optarg, &endptr, 0);
@@ -421,10 +421,10 @@ int main(int argc, char *argv[])
         errx(EXIT_FAILURE, "Specify a program to run");
 
     if (cgroup_path == NULL && controllers)
-        errx(EXIT_FAILURE, "Specify a cgroup path (-p)");
+        errx(EXIT_FAILURE, "Specify a cgroup group_path (-p)");
 
     if (cgroup_path && !controllers)
-        errx(EXIT_FAILURE, "Specify a cgroup controller (-c) if you specify a path");
+        errx(EXIT_FAILURE, "Specify a cgroup controller (-c) if you specify a group_path");
 
     finish_controller_init();
 

@@ -9,7 +9,7 @@ defmodule Shimmy.Options do
   end
 
   defp to_args([{:cgroup_path, path} | rest], args, opts) do
-    to_args(rest, ["--path", path | args], opts)
+    to_args(rest, ["--group", path | args], opts)
   end
 
   defp to_args([{:delay_to_sigkill, delay} | rest], args, opts) do
@@ -42,8 +42,8 @@ defmodule Shimmy.Options do
 
   defp sets_to_args([], args), do: args
 
-  defp sets_to_args([controller | rest], args) do
-    new_args = ["--set", controller | args]
-    controllers_to_args(rest, new_args)
+  defp sets_to_args([{controller, variable, value} | rest], args) do
+    new_args = ["--controller", controller, "--set", "#{variable}=#{value}" | args]
+    sets_to_args(rest, new_args)
   end
 end

@@ -310,6 +310,12 @@ static void kill_child_nicely(pid_t child)
 
 static struct controller_info *add_controller(const char *name)
 {
+    // If the controller exists, don't add it twice.
+    for (struct controller_info *c = controllers; c != NULL; c = c->next) {
+        if (strcmp(name, c->name) == 0)
+            return c;
+    }
+
     struct controller_info *new_controller = malloc(sizeof(struct controller_info));
     new_controller->name = name;
     new_controller->group_path = NULL;

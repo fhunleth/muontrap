@@ -20,10 +20,10 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-shimmy-*.tar
+muontrap-*.tar
 
 /priv
 
 *.o
-shimmy-debug.log
+muontrap-debug.log
 test/*.test

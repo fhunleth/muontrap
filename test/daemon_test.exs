@@ -1,8 +1,8 @@
 defmodule DaemonTest do
   use ExUnit.Case
-  import ShimmyTestHelpers
+  import MuonTrapTestHelpers
 
-  alias Shimmy.Daemon
+  alias MuonTrap.Daemon
 
   test "stopping the daemon kills the process" do
     {:ok, pid} = Daemon.start_link("test/do_nothing.test", [])

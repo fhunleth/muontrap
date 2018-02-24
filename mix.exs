@@ -1,13 +1,13 @@
-defmodule Shimmy.MixProject do
+defmodule MuonTrap.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :shimmy,
+      app: :muontrap,
       version: "0.1.0",
       elixir: "~> 1.6",
-      description: "Shim your ports",
-      source_url: "https://github.com/fhunleth/shimmy",
+      description: "Keep your ports contained",
+      source_url: "https://github.com/fhunleth/muontrap",
       docs: [extras: ["README.md"], main: "readme"],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -43,7 +43,7 @@ defmodule Shimmy.MixProject do
       ],
       maintainers: ["Frank Hunleth"],
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/fhunleth/shimmy"}
+      links: %{"GitHub" => "https://github.com/fhunleth/muontrap"}
     ]
   end
 end

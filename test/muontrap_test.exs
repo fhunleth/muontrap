@@ -1,11 +1,13 @@
-defmodule ShimmyTest do
+defmodule MuonTrapTest do
   use ExUnit.Case
-  import ShimmyTestHelpers
+  import MuonTrapTestHelpers
 
-  doctest Shimmy
+  doctest MuonTrap
 
   test "closing the port kills the process" do
-    port = Port.open({:spawn_executable, Shimmy.shimmy_path()}, args: ["./test/do_nothing.test"])
+    port =
+      Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["./test/do_nothing.test"])
+
     os_pid = os_pid(port)
     assert is_os_pid_around?(os_pid)
 
@@ -16,7 +18,7 @@ defmodule ShimmyTest do
 
   test "closing the port kills a process that ignores sigterm" do
     port =
-      Port.open({:spawn_executable, Shimmy.shimmy_path()}, args: ["test/ignore_sigterm.test"])
+      Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["test/ignore_sigterm.test"])
 
     os_pid = os_pid(port)
     assert is_os_pid_around?(os_pid)
@@ -28,7 +30,7 @@ defmodule ShimmyTest do
   test "delaying the SIGKILL" do
     port =
       Port.open(
-        {:spawn_executable, Shimmy.shimmy_path()},
+        {:spawn_executable, MuonTrap.muontrap_path()},
         args: ["--delay-to-sigkill", "250000", "test/ignore_sigterm.test"]
       )
 

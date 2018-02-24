@@ -65,7 +65,7 @@ static void move_pid_to_cgroups(pid_t pid);
 
 static void usage()
 {
-    printf("Usage: shimmy [OPTION] -- <program> <args>\n");
+    printf("Usage: muontrap [OPTION] -- <program> <args>\n");
     printf("\n");
     printf("Options:\n");
 
@@ -338,7 +338,7 @@ static void add_controller_setting(struct controller_info *controller, const cha
 int main(int argc, char *argv[])
 {
 #ifdef DEBUG
-    debugfp = fopen("shimmy-debug.log", "w");
+    debugfp = fopen("muontrap-debug.log", "w");
     if (!debugfp)
         debugfp = stderr;
 #endif

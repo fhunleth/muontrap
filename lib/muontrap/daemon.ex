@@ -1,8 +1,8 @@
-defmodule Shimmy.Daemon do
+defmodule MuonTrap.Daemon do
   use GenServer
 
   require Logger
-  alias Shimmy.Options
+  alias MuonTrap.Options
 
   defmodule State do
     @moduledoc nil
@@ -26,7 +26,7 @@ defmodule Shimmy.Daemon do
   end
 
   @doc """
-  Return the OS pid to the shimmy executable.
+  Return the OS pid to the muontrap executable.
   """
   def os_pid(pid) do
     GenServer.call(pid, :os_pid)
@@ -35,10 +35,10 @@ defmodule Shimmy.Daemon do
   def init([command, args, opts]) do
     group = Keyword.get(opts, :group)
 
-    {shimmy_args, _updated_opts} = Options.to_args(opts)
-    updated_args = shimmy_args ++ ["--", command] ++ args
+    {muontrap_args, _updated_opts} = Options.to_args(opts)
+    updated_args = muontrap_args ++ ["--", command] ++ args
 
-    port = Port.open({:spawn_executable, Shimmy.shimmy_path()}, args: updated_args)
+    port = Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: updated_args)
 
     {:ok, %State{command: command, port: port, group: group}}
   end

@@ -16,7 +16,7 @@ OBJ=$(SRC:.c=.o)
 
 .PHONY: all clean
 
-all: ../priv ../priv/shimmy
+all: ../priv ../priv/muontrap
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
@@ -24,9 +24,9 @@ all: ../priv ../priv/shimmy
 ../priv:
 	mkdir ../priv
 
-../priv/shimmy: $(OBJ)
+../priv/muontrap: $(OBJ)
 	$(CC) $^ $(LDFLAGS) -o $@
 
 clean:
-	rm -f ../priv/shimmy *.o
+	rm -f ../priv/muontrap *.o
 	-rmdir ../priv

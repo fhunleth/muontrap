@@ -1,6 +1,6 @@
 defmodule CgroupTest do
   use ExUnit.Case
-  import ShimmyTestHelpers
+  import MuonTrapTestHelpers
 
   @tag :cgroup
   test "cgroup gets created and removed on exit" do
@@ -8,7 +8,7 @@ defmodule CgroupTest do
 
     port =
       Port.open(
-        {:spawn_executable, Shimmy.shimmy_path()},
+        {:spawn_executable, MuonTrap.muontrap_path()},
         args: ["-p", cgroup_path, "-c", "cpu", "./test/do_nothing.test"]
       )
 
@@ -28,7 +28,7 @@ defmodule CgroupTest do
 
     port =
       Port.open(
-        {:spawn_executable, Shimmy.shimmy_path()},
+        {:spawn_executable, MuonTrap.muontrap_path()},
         args: ["-p", cgroup_path, "-c", "cpu", "./test/fork_a_lot.test"]
       )
 

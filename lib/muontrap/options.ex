@@ -1,4 +1,4 @@
-defmodule Shimmy.Options do
+defmodule MuonTrap.Options do
   def to_args(options), do: to_args(options, [], [])
 
   defp to_args([], args, opts), do: {args, opts}

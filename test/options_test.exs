@@ -1,6 +1,6 @@
 defmodule OptionsTest do
   use ExUnit.Case
-  alias Shimmy.Options
+  alias MuonTrap.Options
 
   test "parses cgroup controllers" do
     {args, leftover_opts} = Options.to_args(cgroup_controllers: ["cpu", "memory"])

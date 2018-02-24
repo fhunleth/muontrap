@@ -10,11 +10,11 @@ use Mix.Config
 
 # You can configure your application as:
 #
-#     config :shimmy, key: :value
+#     config :muontrap, key: :value
 #
 # and access this configuration in your application as:
 #
-#     Application.get_env(:shimmy, :key)
+#     Application.get_env(:muontrap, :key)
 #
 # You can also configure a 3rd-party app:
 #

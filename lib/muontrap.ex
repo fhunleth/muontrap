@@ -1,15 +1,15 @@
-defmodule Shimmy do
+defmodule MuonTrap do
   @moduledoc """
-  Documentation for Shimmy.
+  Documentation for MuonTrap.
   """
-  alias Shimmy.Options
+  alias MuonTrap.Options
 
   @doc ~S"""
-  Executes a command like `System.cmd/3` but using `shimmy`.
+  Executes a command like `System.cmd/3` but using `muontrap`.
 
   ## Examples
 
-      iex> Shimmy.cmd("echo", ["hello"])
+      iex> MuonTrap.cmd("echo", ["hello"])
       {"hello\n", 0}
 
   ## Options
@@ -26,15 +26,15 @@ defmodule Shimmy do
   @spec cmd(binary(), [binary()], keyword()) ::
           {Collectable.t(), exit_status :: non_neg_integer()}
   def cmd(command, args, opts \\ []) do
-    {shimmy_args, updated_opts} = Options.to_args(opts)
-    updated_args = shimmy_args ++ ["--", command] ++ args
-    System.cmd(shimmy_path(), updated_args, updated_opts)
+    {muontrap_args, updated_opts} = Options.to_args(opts)
+    updated_args = muontrap_args ++ ["--", command] ++ args
+    System.cmd(muontrap_path(), updated_args, updated_opts)
   end
 
   @doc """
-  Return the absolute path to the shimmy executable.
+  Return the absolute path to the muontrap executable.
   """
-  def shimmy_path() do
-    Application.app_dir(:shimmy, "priv/shimmy")
+  def muontrap_path() do
+    Application.app_dir(:muontrap, "priv/muontrap")
   end
 end

@@ -1,21 +1,22 @@
+#include <err.h>
+#include <errno.h>
+#include <getopt.h>
+#include <grp.h>
+#include <poll.h>
+#include <pwd.h>
+#include <signal.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-#include <err.h>
-#include <getopt.h>
-#include <unistd.h>
-#include <signal.h>
-#include <poll.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <pwd.h>
-#include <grp.h>
+#include <time.h>
+#include <unistd.h>
 
 #ifdef DEBUG
 static FILE *debugfp = NULL;
-#define INFO(MSG, ...) do { fprintf(debugfp, MSG, ## __VA_ARGS__); fflush(debugfp); } while (0)
+#define INFO(MSG, ...) do { fprintf(debugfp, MSG "\n", ## __VA_ARGS__); fflush(debugfp); } while (0)
 #else
 #define INFO(MSG, ...) ;
 #endif
@@ -85,11 +86,32 @@ void sigchild_handler(int signum)
         warn("write(signal_pipe)");
 }
 
+void enable_signals()
+{
+    struct sigaction sa;
+    sa.sa_handler = sigchild_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    sigaction(SIGCHLD, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGQUIT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+}
+
+void disable_signals()
+{
+    sigaction(SIGCHLD, NULL, NULL);
+    sigaction(SIGINT, NULL, NULL);
+    sigaction(SIGQUIT, NULL, NULL);
+    sigaction(SIGTERM, NULL, NULL);
+}
+
 static int fork_exec(const char *group_path, char *const *argv)
 {
-    INFO("Running %s\n", group_path);
+    INFO("Running %s", group_path);
     for (char *const *arg = argv; *arg != NULL; arg++) {
-        INFO("  arg: %s\n", *arg);
+        INFO("  arg: %s", *arg);
     }
 
     pid_t pid = fork();
@@ -147,7 +169,7 @@ static void create_cgroups()
 {
     FOREACH_CONTROLLER {
         int start_index = strlen(CGROUP_MOUNT_PATH) + 1 + strlen(controller->name) + 1;
-        INFO("Create cgroup: mkdir -p %s\n", controller->group_path);
+        INFO("Create cgroup: mkdir -p %s", controller->group_path);
         if (mkdir_p(controller->group_path, start_index) < 0) {
             if (errno == EEXIST)
                 errx(EXIT_FAILURE, "'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
@@ -200,7 +222,7 @@ static void destroy_cgroups()
     FOREACH_CONTROLLER {
         // Only remove the final directory, since we don't keep track of
         // what we actually create.
-        INFO("rmdir %s\n", controller->group_path);
+        INFO("rmdir %s", controller->group_path);
         rmdir(controller->group_path);
     }
 }
@@ -213,7 +235,7 @@ static void procfile_killall(const char *group_path, int sig)
 
     int pid;
     while (fscanf(fp, "%d", &pid) == 1) {
-        INFO("  kill -%d %d\n", sig, pid);
+        INFO("  kill -%d %d", sig, pid);
         kill(pid, sig);
     }
     fclose(fp);
@@ -235,7 +257,7 @@ static int procfile_has_processes(const char *group_path)
 static void kill_children(int sig)
 {
     FOREACH_CONTROLLER {
-        INFO("killall -%d from %s\n", sig, controller->procfile);
+        INFO("killall -%d from %s", sig, controller->procfile);
         procfile_killall(controller->procfile, sig);
     }
 }
@@ -259,13 +281,9 @@ static int child_processes_exist()
 
 static void cleanup()
 {
-    INFO("cleaning up!\n");
+    INFO("cleaning up!");
 
-    // Turn off signal handlers
-    sigaction(SIGCHLD, NULL, NULL);
-    sigaction(SIGINT, NULL, NULL);
-    sigaction(SIGQUIT, NULL, NULL);
-    sigaction(SIGTERM, NULL, NULL);
+    disable_signals();
 
     // If the subprocess responded to our SIGTERM, then hopefully
     // nothing exists, but if subprocesses do exist, repeatedly
@@ -292,20 +310,59 @@ static void cleanup()
     // Clean up our cgroup
     destroy_cgroups();
 
-    INFO("cleanup done\n");
+    INFO("cleanup done");
+}
+
+static int microsecs()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (ts.tv_sec * 1000000) + (ts.tv_nsec / 1000);
 }
 
 static void kill_child_nicely(pid_t child)
 {
     // Start with SIGTERM
-    kill(child, SIGTERM);
+    int rc = kill(child, SIGTERM);
+    INFO("kill -%d %d -> %d (%s)", SIGTERM, child, rc, strerror(errno));
+    if (rc < 0)
+        return;
 
     // Wait a little.
-    if (brutal_kill_wait_us > 0)
-        usleep(brutal_kill_wait_us);
+    if (brutal_kill_wait_us > 0) {
+        int start = microsecs();
+        int timeleft = brutal_kill_wait_us;
+        INFO("Wait %d us. Time is %d", timeleft, microsecs());
+        for (;;) {
+            rc = usleep(timeleft);
+            if (rc == 0) {
+                break;
+            } else {
+                int reason = errno;
+
+                // Error from usleep. Check if moot since child exited.
+                if (kill(child, 0) < 0) {
+                    INFO("Child %d not running any more.", child);
+                    return;
+                }
+                if (reason == EINTR) {
+                    // Try again with a possibly shorter timeout.
+                    timeleft = brutal_kill_wait_us - (microsecs() - start);
+                    if (timeleft <= 0)
+                        break;
+                } else {
+                    warn("usleep");
+                    break;
+                }
+            }
+        }
+
+        INFO("Wait complete. Time is %d", microsecs());
+    }
 
     // Brutal kill
-    kill(child, SIGKILL);
+    rc = kill(child, SIGKILL);
+    INFO("kill -%d %d -> %d (%s)", SIGKILL, child, rc, strerror(errno));
 }
 
 static struct controller_info *add_controller(const char *name)
@@ -338,7 +395,9 @@ static void add_controller_setting(struct controller_info *controller, const cha
 int main(int argc, char *argv[])
 {
 #ifdef DEBUG
-    debugfp = fopen("muontrap-debug.log", "w");
+    char filename[64];
+    sprintf(filename, "muontrap-%d.log", getpid());
+    debugfp = fopen(filename, "w");
     if (!debugfp)
         debugfp = stderr;
 #endif
@@ -435,19 +494,9 @@ int main(int argc, char *argv[])
     finish_controller_init();
 
     if (pipe(signal_pipe) < 0)
-        err(EXIT_FAILURE, "pipe");
+        err(EXIT_FAILURE, "pipeenable");
 
-    /* Set up the structure to specify the new action. */
-    struct sigaction sa;
-    sa.sa_handler = sigchild_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-
-    sigaction(SIGCHLD, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGQUIT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
-
+    enable_signals();
     atexit(cleanup);
 
     create_cgroups();
@@ -455,13 +504,11 @@ int main(int argc, char *argv[])
     update_cgroup_settings();
 
     pid_t pid = fork_exec(argv[optind], &argv[optind]);
-    struct pollfd fds[3];
+    struct pollfd fds[2];
     fds[0].fd = STDIN_FILENO;
     fds[0].events = POLLHUP; // POLLERR is implicit
     fds[1].fd = signal_pipe[0];
     fds[1].events = POLLIN;
-    fds[2].fd = STDOUT_FILENO;
-    fds[2].events = POLLHUP; // POLLERR is implicit
 
     for (;;) {
         if (poll(fds, 2, -1) < 0) {
@@ -473,11 +520,7 @@ int main(int argc, char *argv[])
 
         if (fds[0].revents) {
             INFO("stdin closed. cleaning up...");
-            kill_child_nicely(pid);
-            break;
-        }
-        if (fds[2].revents) {
-            INFO("stdout closed. cleaning up...");
+            disable_signals();
             kill_child_nicely(pid);
             break;
         }
@@ -493,10 +536,10 @@ int main(int argc, char *argv[])
                 pid_t dying_pid = wait(&status);
                 if (dying_pid == pid) {
                     int exit_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-                    INFO("main child exited. status=%d, our exit code: %d\n", status, exit_status);
+                    INFO("main child exited. status=%d, our exit code: %d", status, exit_status);
                     exit(exit_status);
                 } else {
-                    INFO("something else caused sigchild: pid=%d, status=%d. our child=%d\n", dying_pid, status, pid);
+                    INFO("something else caused sigchild: pid=%d, status=%d. our child=%d", dying_pid, status, pid);
                 }
                 break;
             }

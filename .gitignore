@@ -25,5 +25,5 @@ muontrap-*.tar
 /priv
 
 *.o
-muontrap-debug.log
+/muontrap-*.log
 test/*.test

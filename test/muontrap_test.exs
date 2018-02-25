@@ -13,6 +13,7 @@ defmodule MuonTrapTest do
 
     Port.close(port)
 
+    wait_for_close_check()
     assert !is_os_pid_around?(os_pid)
   end
 
@@ -24,6 +25,7 @@ defmodule MuonTrapTest do
     assert is_os_pid_around?(os_pid)
     Port.close(port)
 
+    wait_for_close_check()
     assert !is_os_pid_around?(os_pid)
   end
 
@@ -38,11 +40,13 @@ defmodule MuonTrapTest do
     assert is_os_pid_around?(os_pid)
     Port.close(port)
 
+    Process.sleep(100)
     # process should be around for 250ms, so it should be around here.
     assert is_os_pid_around?(os_pid)
 
-    Process.sleep(300)
+    Process.sleep(200)
 
+    # Now it should be gone
     assert !is_os_pid_around?(os_pid)
   end
 end

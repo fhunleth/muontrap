@@ -18,6 +18,7 @@ defmodule CgroupTest do
 
     Port.close(port)
 
+    wait_for_close_check()
     assert !is_os_pid_around?(os_pid)
     assert !cpu_cgroup_exists(cgroup_path)
   end
@@ -38,9 +39,7 @@ defmodule CgroupTest do
 
     Port.close(port)
 
-    # Give the port a chance to clean up
-    Process.sleep(100)
-
+    wait_for_close_check()
     assert !is_os_pid_around?(os_pid)
     assert !cpu_cgroup_exists(cgroup_path)
   end

@@ -11,6 +11,7 @@ defmodule DaemonTest do
 
     GenServer.stop(pid)
 
+    wait_for_close_check()
     assert !is_os_pid_around?(os_pid)
   end
 end

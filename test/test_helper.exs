@@ -1,6 +1,8 @@
 ExUnit.start()
 
 defmodule MuonTrapTestHelpers do
+  @timeout_before_close_check 10
+
   def cpu_cgroup_exists(path) do
     {rc, 0} = System.cmd("cgget", ["-g", "cpu", path], stderr_to_stdout: true)
     String.match?(rc, ~r/cpu.shares/)
@@ -36,6 +38,10 @@ defmodule MuonTrapTestHelpers do
   def os_pid(port) do
     {:os_pid, os_pid} = Port.info(port, :os_pid)
     os_pid
+  end
+
+  def wait_for_close_check(timeout \\ @timeout_before_close_check) do
+    Process.sleep(timeout)
   end
 end
 

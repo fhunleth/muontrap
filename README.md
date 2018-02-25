@@ -1,17 +1,76 @@
 # MuonTrap
 
-Keep your Erlang/Elixir port processes under control. This lightweight shim
-protects you from port zombies. If you're on Linux and cgroups are available, it
-can do cgroup things like limit memory and CPU utilization. As an added bonus,
-it will kill all child processes when the port goes away so that processes can't
-pollute the system with their daemons.
+Keep programs, deamons, and applications launched from Erlang and Elixir
+contained and well-behaved. This lightweight library kills OS processes if the
+Elixir process running them crashes and if you're running on Linux, it can use
+cgroups to prevent many other shenanigans.
 
-This is intended for long running processes or running commands. It currently
-doesn't support sending input from Erlang and Elixir to the process that it's
-running. That feature is possible to add, but you may be happier with other
-solutions like [erlexec](https://github.com/saleyn/erlexec/) that have more
-features for dealing with interactive processes. Output is passed back to
-Erlang.
+Some other features:
+
+* Set `cgroup` controls like thresholds on memory and CPU utilization
+* Start OS processes as a different user or group
+* Send SIGKILL to processes that aren't responsive to SIGTERM
+* With `cgroups`, ensure that all children of launched processes have been killed too
+
+## The problem
+
+The Erlang VM's port interface lets Elixir applications run external programs.
+This is important since it's not practical to rewrite everything in Elixir.
+Plus, if the program is long running like a daemon or a server, you use Elixir
+to supervise it and restart it on crashes. The catch is that the Erlang VM
+expects port processes to be well-behaved. As you'd expect, many useful programs
+don't quite meet the Erlang VM's expectations.
+
+For example, let's say that you want to monitor a network connection and decide
+that `ping` is the right tool. Here's how you could start `ping` in a process.
+
+```elixir
+iex> pid = spawn(fn -> System.cmd("ping", ["-i", "5", "localhost"], into: IO.stream(:stdio, :line)) end)
+#PID<0.6116.0>
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=0.032 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.077 ms
+```
+
+To see that `ping` is running, call `ps` to look for it. You can also do this
+from a separate terminal window outside of IEx:
+
+```elixir
+iex> :os.cmd('ps -ef | grep ping') |> IO.puts
+  501 38820 38587   0  9:26PM ??         0:00.01 /sbin/ping -i 5 localhost
+  501 38824 38822   0  9:27PM ??         0:00.00 grep ping
+:ok
+```
+
+Now exit the Elixir process. Imagine here that in the real program that
+something happened in Elixir and the process needs to exit and be restarted by a
+supervisor.
+
+```elixir
+iex> Process.exit(pid, :oops)
+true
+iex> :os.cmd('ps -ef | grep ping') |> IO.puts
+  501 38820 38587   0  9:26PM ??         0:00.02 /sbin/ping -i 5 localhost
+  501 38833 38831   0  9:34PM ??         0:00.00 grep ping
+```
+
+As you can tell, `ping` is still running after the exit. If you run `:observer`
+you'll see that Elixir did indeed terminate both the process and the port, but
+that didn't stop `ping`. The reason for this is that `ping` doesn't pay
+attention to `stdin` and doesn't notice the Erlang VM closing it to signal that
+it should exit.
+
+Imagine now that the process was supervised and it restarts. If this happens a
+regularly, you could be running dozens of `ping` commands.
+
+This is just one of the problems that `muontrap` fixes.
+
+## Applicability
+
+This is intended for long running processes. It's not great for interactive
+programs that communicate via the port or send signals. That feature is possible
+to add, but you'll probably be happier with other solutions like
+[erlexec](https://github.com/saleyn/erlexec/).
 
 ## Installation
 
@@ -26,19 +85,31 @@ def deps do
 end
 ```
 
-## The problem
+## Running commands
 
-Erlang's port implementation expects the processes it launches to exit when
-it closes stdin.
+The simplest way to use `muontrap` is as a replacement to `System.cmd/3`. Here's
+an example using `ping`:
 
 ```elixir
-System.cmd("/home/fhunleth/experiments/cgroup_test/cgroup_test", ["-p", "frank/foo", "-c", "cpu", "ping", "localhost"], into: IO.stream(:stdio, :line))
+iex> pid = spawn(fn -> MuonTrap.cmd("ping", ["-i", "5", "localhost"], into: IO.stream(:stdio, :line)) end)
+#PID<0.30860.0>
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=0.027 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.081 ms
 ```
 
-If you run `ping` without `muontrap`, you can watch it hang around even when if you kill
-the process running `System.cmd`.
+Now if you exit that process, `ping` gets killed as well:
 
-### Basic containment
+```elixir
+iex> Process.exit(pid, :oops)
+true
+iex> :os.cmd('ps -ef | grep ping') |> IO.puts
+  501 38898 38896   0  9:58PM ??         0:00.00 grep ping
+
+:ok
+```
+
+## Containment with cgroups
 
 Even if you don't make use of any cgroup controller features, having your port
 processed contained can be useful just to make sure that all forked processes
@@ -84,9 +155,3 @@ ms.
 muontrap -p mycgroup/test -c cpu -s cpu.cfs_period_us=100000 -s cpu.cfs_quota_us=50000 -- myprogram myargs
 ```
 
-## Limitations
-
-If `stdin` isn't closed on `muontrap`, then it won't detect the the Erlang side
-has gone away. If you invoke `muontrap` directly from `Port.open/2` or
-`System.cmd/3`, this isn't a problem. However, `:os.cmd/1` starts a shell before
-running the command and it won't close `stdin` on `muontrap`.

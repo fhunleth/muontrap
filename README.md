@@ -1,5 +1,8 @@
 # MuonTrap
 
+[![Build Status](https://travis-ci.org/fhunleth/muontrap.svg?branch=master)](https://travis-ci.org/fhunleth/muontrap)
+[![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
+
 --> _Under active development_ <--
 
 Keep programs, deamons, and applications launched from Erlang and Elixir

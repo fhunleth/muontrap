@@ -1,0 +1,50 @@
+# Travis doesn't have Erlang on OSX, so we have to install it manually on both
+language: c
+
+sudo: required
+dist: trusty
+
+os:
+    - linux
+    - osx
+
+compiler:
+    - gcc
+    - clang
+
+matrix:
+    exclude:
+        - os: osx
+          compiler: gcc
+        - os: linux
+          compiler: clang
+
+env:
+  - ELIXIR_VERSION=1.6.1 ERLANG_VERSION=20.1
+
+before_install:
+    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+        sudo apt-get update -qq;
+        sudo apt-get install cgroup-bin;
+        sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test;
+        wget https://s3.amazonaws.com/travis-otp-releases/binaries/$(lsb_release -is | tr "A-Z" "a-z")/$(lsb_release -rs)/$(uname -m)/erlang-$ERLANG_VERSION-nonroot.tar.bz2;
+        mkdir -p ~/otp && tar -xf erlang-$ERLANG_VERSION-nonroot.tar.bz2 -C ~/otp/;
+        mkdir -p ~/.kerl;
+        source $HOME/otp/$ERLANG_VERSION/activate;
+        wget https://github.com/elixir-lang/elixir/releases/download/v$ELIXIR_VERSION/Precompiled.zip;
+        unzip -d elixir Precompiled.zip;
+      else
+        brew update;
+        brew install elixir;
+      fi
+
+before_script:
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then export PATH=`pwd`/elixir/bin:$PATH; fi
+
+script:
+  - mix local.hex --force
+  - mix deps.get
+  - mix compile
+  - mix test
+  - mix docs
+  - mix format --check-formatted

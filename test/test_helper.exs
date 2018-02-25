@@ -19,7 +19,7 @@ defmodule MuonTrapTestHelpers do
 
     unless cpu_cgroup_exists("muontrap_test") and memory_cgroup_exists("muontrap_test") do
       IO.puts(:stderr, "\nPlease create the muontrap_test cgroup")
-      IO.puts(:stderr, "sudo cgcreate -a $USER -g memory,cpu:muontrap_test")
+      IO.puts(:stderr, "sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test")
       System.halt(0)
     end
   end

@@ -1,7 +1,7 @@
 all:
 	$(MAKE) -C src
-	$(MAKE) -C test
+	if [ -f test/Makefile ]; then $(MAKE) -C test; fi
 
 clean:
 	$(MAKE) -C src clean
-	$(MAKE) -C test clean
+	if [ -f test/Makefile ]; then $(MAKE) -C test clean; fi

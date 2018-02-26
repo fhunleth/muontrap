@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.1
+
+* Bug fixes
+  * Fix hex package contents
+
 ## v0.2.0
 
 * Bug fixes

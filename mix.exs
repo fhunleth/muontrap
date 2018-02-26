@@ -4,7 +4,7 @@ defmodule MuonTrap.MixProject do
   def project do
     [
       app: :muontrap,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.6",
       description: "Keep your ports contained",
       source_url: "https://github.com/fhunleth/muontrap",
@@ -12,7 +12,6 @@ defmodule MuonTrap.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       compilers: [:elixir_make] ++ Mix.compilers(),
-      make_makefile: "Makefile",
       make_clean: ["clean"],
       package: package()
     ]
@@ -35,7 +34,7 @@ defmodule MuonTrap.MixProject do
         "lib",
         "src/*.[ch]",
         "src/Makefile",
-        "test",
+        "Makefile",
         "mix.exs",
         "README.md",
         "LICENSE",

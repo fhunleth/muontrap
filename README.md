@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/fhunleth/muontrap.svg?branch=master)](https://travis-ci.org/fhunleth/muontrap)
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
 
---> _Under active development_ <--
+--> Under active development - expect some API changes, but it's good enough for experimental use <--
 
 Keep programs, deamons, and applications launched from Erlang and Elixir
 contained and well-behaved. This lightweight library kills OS processes if the
@@ -85,7 +85,7 @@ by adding `muontrap` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:muontrap, "~> 0.1.0"}
+    {:muontrap, "~> 0.2"}
   ]
 end
 ```
@@ -117,45 +117,58 @@ iex> :os.cmd('ps -ef | grep ping') |> IO.puts
 ## Containment with cgroups
 
 Even if you don't make use of any cgroup controller features, having your port
-processed contained can be useful just to make sure that all forked processes
-are cleaned up on exit.
+process contained can be useful just to make sure that everything is cleaned
+up on exit including any subprocesses.
 
 To set this up, first create a cgroup with appropriate permissions. Any path
 will do; `muontrap` just needs to be able to create a subdirectory underneath it
 for its use. For example:
 
 ```bash
-sudo cgcreate -a fhunleth -g memory,cpu:mycgroup
+sudo cgcreate -a $(whoami) -g memory,cpu:mycgroup
 ```
 
 Be sure to create the group for all of the cgroup controllers that you wish to
-use with `muontrap`.
+use with `muontrap`. The above example creates it for the `memory` and `cpu`
+controllers.
 
-Next, in your Erlang or Elixir program, use `muontrap` in your port call and pass
-the cgroup path and a subpath for use by the port process.
+In Elixir, call `MuonTrap.cmd/3` with the
+cgroup options now. In this case, we'll use the `cpu` controller, but this
+example would work fine with any of the controllers.
 
-```bash
-muontrap -g mycgroup/test -c cpu -c memory -- myprogram myargs
+```elixir
+iex>  MuonTrap.cmd("spawning_program", [], cgroup_controllers: ["cpu"], cgroup_path: "mycgroup/test")
+{"hello\n", 0}
 ```
 
-`muontrap` will start `myprogram` in the `cpu/mycgroup/test` and
-`memory/mycgroup/test` groups. The cgroup parameters may be modified outside of
-`muontrap` using `cgset` or my accessing the cgroup mountpoint manually. If you're
-not going to do this, you only need to specify one controller.
+In this example, `muontrap` runs `spawning_program` in the `cpu/mycgroup/test`
+group. The cgroup parameters may be modified outside of
+`muontrap` using `cgset` or my accessing the cgroup mountpoint manually.
 
-On any error or if the Erlang VM closes the port or if `myprogram` exits,
+On any error or if the Erlang VM closes the port or if `spawning_program` exits,
 `muontrap` will kill all OS processes in `mycgroup/test`. No need to worry about
 random processes accumulating on your system.
 
+### Limit the memory used by a process
+
+Linux's cgroups are very powerful and the examples here only scratch the
+surface. If you'd like to limit an OS process and all of its child processes to
+a maximum amount of memory, you can do that with the `memory` controller:
+
+```elixir
+iex>  MuonTrap.cmd("memory_hog", [], cgroup_controllers: ["memory"], cgroup_path: "mycgroup/test2", cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}])
+```
+
+That line restricts the total memory used by `memory_hog` to 256 MB.
+
 ### Limit CPU usage in a port
 
-Imagine that you'd like all of your port process to be kept in a cgroup that is
-limited to using 50% of a CPU. First, make sure that a cgroup exists with
-sufficient permissions. Call that `mycgroup`. `muontrap` will create a subpath of
-that group where it will move your port process. The `cpu.cfs_*` settings will
-make it so that `myprogram` gets scheduled no more than 50 ms out of every 100
-ms.
+Limiting the maximum CPU usage is also possible. Two parameters control that
+with the `cpu` controller: `cpu.cfs_period_us` specifies the number of
+microseconds in the scheduling period and `cpu.cfs_quota_us` specifies how many
+of those microseconds can be used. Here's an example call that prevents a
+program from using more than 50% of the CPU:
 
-```bash
-muontrap -g mycgroup/test -c cpu -s cpu.cfs_period_us=100000 -s cpu.cfs_quota_us=50000 -- myprogram myargs
+```elixir
+iex>  MuonTrap.cmd("cpu_hog", [], cgroup_controllers: ["cpu"], cgroup_path: "mycgroup/test3", cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}, {"cpu", "cpu.cfs_quota_us", 50000}])
 ```

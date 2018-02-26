@@ -135,7 +135,7 @@ Next, in your Erlang or Elixir program, use `muontrap` in your port call and pas
 the cgroup path and a subpath for use by the port process.
 
 ```bash
-muontrap -p mycgroup/test -c cpu -c memory -- myprogram myargs
+muontrap -g mycgroup/test -c cpu -c memory -- myprogram myargs
 ```
 
 `muontrap` will start `myprogram` in the `cpu/mycgroup/test` and
@@ -157,5 +157,5 @@ make it so that `myprogram` gets scheduled no more than 50 ms out of every 100
 ms.
 
 ```bash
-muontrap -p mycgroup/test -c cpu -s cpu.cfs_period_us=100000 -s cpu.cfs_quota_us=50000 -- myprogram myargs
+muontrap -g mycgroup/test -c cpu -s cpu.cfs_period_us=100000 -s cpu.cfs_quota_us=50000 -- myprogram myargs
 ```

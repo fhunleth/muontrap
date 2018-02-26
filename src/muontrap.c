@@ -401,6 +401,7 @@ int main(int argc, char *argv[])
     if (!debugfp)
         debugfp = stderr;
 #endif
+    INFO("muontrap argc=%d", argc);
     if (argc == 1) {
         usage();
         exit(EXIT_FAILURE);
@@ -408,16 +409,41 @@ int main(int argc, char *argv[])
 
     int opt;
     struct controller_info *current_controller = NULL;
-    while ((opt = getopt_long(argc, argv, "c:hp:s:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "a:c:g:hk:s:", long_options, NULL)) != -1) {
         switch (opt) {
+        case 'a': // --gid
+        {
+            char *endptr;
+            run_as_gid = strtoul(optarg, &endptr, 0);
+            if (*endptr != '\0') {
+                struct group *group = getgrnam(optarg);
+                if (!group)
+                    errx(EXIT_FAILURE, "Unknown group '%s'", optarg);
+                run_as_gid = group->gr_gid;
+            }
+            if (run_as_gid == 0)
+                errx(EXIT_FAILURE, "Setting the group to root or gid 0 is not allowed");
+            break;
+        }
+
+        case 'c':
+            current_controller = add_controller(optarg);
+            break;
+
         case 'g':
             if (cgroup_path)
                 errx(EXIT_FAILURE, "Only one cgroup group_path supported.");
             cgroup_path = optarg;
             break;
 
-        case 'c':
-            current_controller = add_controller(optarg);
+        case 'h':
+            usage();
+            exit(EXIT_SUCCESS);
+
+        case 'k': // --delay-to-sigkill
+            brutal_kill_wait_us = strtoul(optarg, NULL, 0);
+            if (brutal_kill_wait_us > 1000000)
+                errx(EXIT_FAILURE, "Delay to sending a SIGKILL must be < 1,000,000 (1 second)");
             break;
 
         case 's':
@@ -436,27 +462,6 @@ int main(int argc, char *argv[])
             break;
         }
 
-        case 'k': // --delay-to-sigkill
-            brutal_kill_wait_us = strtoul(optarg, NULL, 0);
-            if (brutal_kill_wait_us > 1000000)
-                errx(EXIT_FAILURE, "Delay to sending a SIGKILL must be < 1,000,000 (1 second)");
-            break;
-
-        case 'a': // --gid
-        {
-            char *endptr;
-            run_as_gid = strtoul(optarg, &endptr, 0);
-            if (*endptr != '\0') {
-                struct group *group = getgrnam(optarg);
-                if (!group)
-                    errx(EXIT_FAILURE, "Unknown group '%s'", optarg);
-                run_as_gid = group->gr_gid;
-            }
-            if (run_as_gid == 0)
-                errx(EXIT_FAILURE, "Setting the group to root or gid 0 is not allowed");
-            break;
-        }
-
         case 'u': // --uid
         {
             char *endptr;
@@ -472,10 +477,6 @@ int main(int argc, char *argv[])
             break;
         }
 
-        case 'h':
-            usage();
-            exit(EXIT_SUCCESS);
-
         default:
             usage();
             exit(EXIT_FAILURE);
@@ -486,7 +487,7 @@ int main(int argc, char *argv[])
         errx(EXIT_FAILURE, "Specify a program to run");
 
     if (cgroup_path == NULL && controllers)
-        errx(EXIT_FAILURE, "Specify a cgroup group_path (-p)");
+        errx(EXIT_FAILURE, "Specify a cgroup group_path (-g)");
 
     if (cgroup_path && !controllers)
         errx(EXIT_FAILURE, "Specify a cgroup controller (-c) if you specify a group_path");

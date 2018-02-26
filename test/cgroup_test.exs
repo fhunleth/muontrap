@@ -9,7 +9,7 @@ defmodule CgroupTest do
     port =
       Port.open(
         {:spawn_executable, MuonTrap.muontrap_path()},
-        args: ["-p", cgroup_path, "-c", "cpu", "./test/do_nothing.test"]
+        args: ["-g", cgroup_path, "-c", "cpu", "./test/do_nothing.test"]
       )
 
     os_pid = os_pid(port)
@@ -30,7 +30,7 @@ defmodule CgroupTest do
     port =
       Port.open(
         {:spawn_executable, MuonTrap.muontrap_path()},
-        args: ["-p", cgroup_path, "-c", "cpu", "./test/fork_a_lot.test"]
+        args: ["-g", cgroup_path, "-c", "cpu", "./test/fork_a_lot.test"]
       )
 
     os_pid = os_pid(port)

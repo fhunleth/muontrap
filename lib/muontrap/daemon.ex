@@ -4,12 +4,22 @@ defmodule MuonTrap.Daemon do
   require Logger
   alias MuonTrap.Options
 
+  @moduledoc """
+  Wrap an OS process in a GenServer so that it can be supervised
+
+
+
+  """
+
   defmodule State do
-    @moduledoc nil
+    @moduledoc false
 
     defstruct [:command, :port, :group]
   end
 
+  @doc """
+
+  """
   def start_link(command, args, opts \\ []) do
     GenServer.start_link(__MODULE__, [command, args, opts])
   end
@@ -21,6 +31,9 @@ defmodule MuonTrap.Daemon do
     GenServer.call(pid, {:cgget, controller, variable_name})
   end
 
+  @doc """
+  Modify a cgroup variable.
+  """
   def cgset(pid, controller, variable_name, value) do
     GenServer.call(pid, {:cgset, controller, variable_name, value})
   end
@@ -59,7 +72,7 @@ defmodule MuonTrap.Daemon do
   end
 
   def handle_info({port, {:data, message}}, %State{port: port} = state) do
-    Logger.debug("#{state.command} #{inspect(message)}")
+    Logger.debug("MuonTrap.Daemon ignoring output from #{state.command}: #{inspect(message)}")
     {:noreply, state}
   end
 end

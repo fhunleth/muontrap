@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.2
+
+* Bug fixes
+  * Add missing depedency on `:logger`
+
 ## v0.2.1
 
 * Bug fixes

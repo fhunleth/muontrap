@@ -57,6 +57,7 @@ defmodule MuonTrap do
 
   Call this if you want to invoke the `muontrap` port binary manually.
   """
+  @spec muontrap_path() :: binary()
   def muontrap_path() do
     Application.app_dir(:muontrap, "priv/muontrap")
   end

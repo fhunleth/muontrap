@@ -1,6 +1,7 @@
 defmodule MuonTrap.Options do
   @moduledoc false
 
+  @spec to_args(keyword()) :: {[binary()], keyword()}
   def to_args(options), do: to_args(options, [], [])
 
   defp to_args([], args, opts), do: {args, opts}

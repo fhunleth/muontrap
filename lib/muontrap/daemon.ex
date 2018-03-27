@@ -6,9 +6,6 @@ defmodule MuonTrap.Daemon do
 
   @moduledoc """
   Wrap an OS process in a GenServer so that it can be supervised
-
-
-
   """
 
   defmodule State do
@@ -18,8 +15,9 @@ defmodule MuonTrap.Daemon do
   end
 
   @doc """
-
+  Start/link a deamon GenServer for the specified command.
   """
+  @spec start_link(binary(), [binary()], keyword()) :: GenServer.on_start()
   def start_link(command, args, opts \\ []) do
     GenServer.start_link(__MODULE__, [command, args, opts])
   end
@@ -51,7 +49,8 @@ defmodule MuonTrap.Daemon do
     {muontrap_args, _updated_opts} = Options.to_args(opts)
     updated_args = muontrap_args ++ ["--", command] ++ args
 
-    port = Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: updated_args)
+    port =
+      Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, args: updated_args)
 
     {:ok, %State{command: command, port: port, group: group}}
   end

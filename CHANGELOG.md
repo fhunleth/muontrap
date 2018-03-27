@@ -1,9 +1,15 @@
 # Changelog
 
+## v0.3.0
+
+* Bug fixes
+  * Make MuonTrap.cmd/3 pass the System.cmd/3 tests
+  * Add a few more specs and fix Dialyzer errors
+
 ## v0.2.2
 
 * Bug fixes
-  * Add missing depedency on `:logger`
+  * Add missing dependency on `:logger`
 
 ## v0.2.1
 

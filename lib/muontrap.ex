@@ -38,7 +38,15 @@ defmodule MuonTrap do
   """
   @spec cmd(binary(), [binary()], keyword()) ::
           {Collectable.t(), exit_status :: non_neg_integer()}
-  def cmd(command, args, opts \\ []) do
+  def cmd(command, args, opts \\ []) when is_binary(command) and is_list(args) do
+    assert_no_null_byte!(command, "MuonTrap.cmd/3")
+
+    unless Enum.all?(args, &is_binary/1) do
+      raise ArgumentError, "all arguments for MuonTrap.cmd/3 must be binaries"
+    end
+
+    command = System.find_executable(command) || :erlang.error(:enoent, [command, args, opts])
+
     {muontrap_args, updated_opts} = Options.to_args(opts)
     updated_args = muontrap_args ++ ["--", command] ++ args
     System.cmd(muontrap_path(), updated_args, updated_opts)
@@ -51,5 +59,17 @@ defmodule MuonTrap do
   """
   def muontrap_path() do
     Application.app_dir(:muontrap, "priv/muontrap")
+  end
+
+  # Copied from Elixir's system.ex to make MuonTrap.cmd pass System.cmd's tests
+  defp assert_no_null_byte!(binary, operation) do
+    case :binary.match(binary, "\0") do
+      {_, _} ->
+        raise ArgumentError,
+              "cannot execute #{operation} for program with null byte, got: #{inspect(binary)}"
+
+      :nomatch ->
+        binary
+    end
   end
 end

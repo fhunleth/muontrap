@@ -31,6 +31,10 @@ defmodule MuonTrap.Options do
     to_args(rest, ["--gid", "#{gid}" | args], opts)
   end
 
+  defp to_args([{:arg0, arg0} | rest], args, opts) do
+    to_args(rest, ["--arg0", arg0 | args], opts)
+  end
+
   defp to_args([other | rest], args, opts) do
     to_args(rest, args, [other | opts])
   end

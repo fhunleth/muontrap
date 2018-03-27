@@ -25,6 +25,7 @@ static FILE *debugfp = NULL;
 #define checked_asprintf(MSG, ...) do { if (asprintf(MSG, ## __VA_ARGS__) < 0) err(EXIT_FAILURE, "asprintf"); } while (0)
 
 static struct option long_options[] = {
+    {"arg0", required_argument, 0, '0'},
     {"controller", required_argument, 0, 'c'},
     {"help",     no_argument,       0, 'h'},
     {"delay-to-sigkill", required_argument, 0, 'k'},
@@ -70,6 +71,7 @@ static void usage()
     printf("\n");
     printf("Options:\n");
 
+    printf("--arg0,-0 <arg0>\n");
     printf("--controller,-c <cgroup controller> (may be specified multiple times)\n");
     printf("--group,-g <cgroup path>\n");
     printf("--set,-s <cgroup variable>=<value>\n (may be specified multiple times)\n");
@@ -107,9 +109,9 @@ void disable_signals()
     sigaction(SIGTERM, NULL, NULL);
 }
 
-static int fork_exec(const char *group_path, char *const *argv)
+static int fork_exec(const char *path, char *const *argv)
 {
-    INFO("Running %s", group_path);
+    INFO("Running %s", path);
     for (char *const *arg = argv; *arg != NULL; arg++) {
         INFO("  arg: %s", *arg);
     }
@@ -129,7 +131,7 @@ static int fork_exec(const char *group_path, char *const *argv)
         if (run_as_uid > 0 && setuid(run_as_uid) < 0)
             err(EXIT_FAILURE, "setuid(%d)", run_as_uid);
 
-        execvp(group_path, argv);
+        execvp(path, argv);
 
         // Not supposed to reach here.
         exit(EXIT_FAILURE);
@@ -408,8 +410,9 @@ int main(int argc, char *argv[])
     }
 
     int opt;
+    char *argv0 = NULL;
     struct controller_info *current_controller = NULL;
-    while ((opt = getopt_long(argc, argv, "a:c:g:hk:s:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "a:c:g:hk:s:0:", long_options, NULL)) != -1) {
         switch (opt) {
         case 'a': // --gid
         {
@@ -477,6 +480,10 @@ int main(int argc, char *argv[])
             break;
         }
 
+        case '0': // --argv0
+            argv0 = optarg;
+            break;
+
         default:
             usage();
             exit(EXIT_FAILURE);
@@ -504,7 +511,10 @@ int main(int argc, char *argv[])
 
     update_cgroup_settings();
 
-    pid_t pid = fork_exec(argv[optind], &argv[optind]);
+    const char *program_name = argv[optind];
+    if (argv0)
+        argv[optind] = argv0;
+    pid_t pid = fork_exec(program_name, &argv[optind]);
     struct pollfd fds[2];
     fds[0].fd = STDIN_FILENO;
     fds[0].events = POLLHUP; // POLLERR is implicit

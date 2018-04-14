@@ -35,6 +35,7 @@ defmodule MuonTrap.Daemon do
   @doc """
   Get the value of the specified cgroup variable.
   """
+  @spec cgget(pid(), binary(), binary()) :: binary()
   def cgget(pid, controller, variable_name) do
     GenServer.call(pid, {:cgget, controller, variable_name})
   end
@@ -42,6 +43,7 @@ defmodule MuonTrap.Daemon do
   @doc """
   Modify a cgroup variable.
   """
+  @spec cgset(pid(), binary(), binary(), binary()) :: :ok | no_return()
   def cgset(pid, controller, variable_name, value) do
     GenServer.call(pid, {:cgset, controller, variable_name, value})
   end
@@ -49,6 +51,7 @@ defmodule MuonTrap.Daemon do
   @doc """
   Return the OS pid to the muontrap executable.
   """
+  @spec os_pid(pid()) :: non_neg_integer()
   def os_pid(pid) do
     GenServer.call(pid, :os_pid)
   end

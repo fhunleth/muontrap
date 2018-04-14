@@ -14,4 +14,11 @@ defmodule DaemonTest do
     wait_for_close_check()
     assert !is_os_pid_around?(os_pid)
   end
+
+  test "exiting the process ends the daemon" do
+    {:ok, pid} = GenServer.start(Daemon, ["echo", ["hello"], []])
+
+    wait_for_close_check()
+    refute Process.alive?(pid)
+  end
 end

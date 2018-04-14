@@ -59,11 +59,11 @@ defmodule MuonTrap.Daemon do
   def init([command, args, opts]) do
     group = Keyword.get(opts, :group)
 
-    {muontrap_args, _updated_opts} = Options.to_args(opts)
+    {muontrap_args, leftover_opts} = Options.to_args(opts)
     updated_args = muontrap_args ++ ["--", command] ++ args
 
-    port =
-      Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, args: updated_args)
+    port_options = [:exit_status, {:args, updated_args} | leftover_opts]
+    port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
     {:ok, %State{command: command, port: port, group: group}}
   end
@@ -84,7 +84,12 @@ defmodule MuonTrap.Daemon do
   end
 
   def handle_info({port, {:data, message}}, %State{port: port} = state) do
-    Logger.debug("MuonTrap.Daemon ignoring output from #{state.command}: #{inspect(message)}")
+    Logger.debug("MuonTrap.Daemon(#{state.command}): #{inspect(message)}")
     {:noreply, state}
+  end
+
+  def handle_info({port, {:exit_status, status}}, %State{port: port} = state) do
+    Logger.error("MuonTrap.Daemon(#{state.command}): Process exited with status #{status}")
+    {:stop, :normal, state}
   end
 end

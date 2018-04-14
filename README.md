@@ -172,3 +172,27 @@ program from using more than 50% of the CPU:
 ```elixir
 iex>  MuonTrap.cmd("cpu_hog", [], cgroup_controllers: ["cpu"], cgroup_path: "mycgroup/test3", cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}, {"cpu", "cpu.cfs_quota_us", 50000}])
 ```
+
+## Supervision
+
+For many long running programs, you may want to restart them if they crash.
+Luckily Erlang already has mechanisms to do this. `MuonTrap` provides a
+`GenServer` called `MuonTrap.Daemon` that you can hook into one of your
+supervision trees.  For example, you could specify it like this in your
+application's supervisor::
+
+```elixir
+  def start(_type, _args) do
+    children = [
+      {MuonTrap.Daemon, ["command", ["arg1", "arg2"], options]}
+    ]
+
+    opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+```
+
+If part of the startup of your command involves an initialization sequence, you
+may want to manually  call `MuonTrap.Daemon.start_link/3` so that if anything
+happens to the command or your Elixir code that it gets restarted and
+reinitialized automatically.

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.1
+
+* Bug fixes
+  * Make MuonTrap.Daemon usable (childspecs, options)
+
 ## v0.3.0
 
 * Bug fixes

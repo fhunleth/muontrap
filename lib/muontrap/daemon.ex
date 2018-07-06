@@ -5,7 +5,20 @@ defmodule MuonTrap.Daemon do
   alias MuonTrap.Options
 
   @moduledoc """
-  Wrap an OS process in a GenServer so that it can be supervised
+  Wrap an OS process in a GenServer so that it can be supervised.
+
+  For example, in your children list add MuonTrap.Daemon like this:
+
+  ```elixir
+  children = [
+    {MuonTrap.Daemon, ["myserver", ["--options", "foo")], [cd: "/somedirectory"]]}
+  ]
+
+  opts = [strategy: :one_for_one, name: MyApplication.Supervisor]
+  Supervisor.start_link(children, opts)
+  ```
+
+  See `MuonTrap.cmd/3` for information about the arguments passed in the tuple.
   """
 
   defmodule State do

@@ -1,5 +1,6 @@
 defmodule DaemonTest do
   use ExUnit.Case
+  import ExUnit.CaptureLog
   import MuonTrapTestHelpers
 
   alias MuonTrap.Daemon
@@ -20,5 +21,25 @@ defmodule DaemonTest do
 
     wait_for_close_check()
     refute Process.alive?(pid)
+  end
+
+  test "daemon logs output when told" do
+    fun = fn ->
+      {:ok, _pid} = GenServer.start(Daemon, ["echo", ["hello"], [log_output: :error]])
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "hello"
+  end
+
+  test "daemon doesn't log output by default" do
+    fun = fn ->
+      {:ok, _pid} = GenServer.start(Daemon, ["echo", ["hello"], []])
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    refute capture_log(fun) =~ "hello"
   end
 end

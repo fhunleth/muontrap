@@ -18,13 +18,15 @@ defmodule MuonTrap.Daemon do
   Supervisor.start_link(children, opts)
   ```
 
-  See `MuonTrap.cmd/3` for information about the arguments passed in the tuple.
+  The same options as `MuonTrap.cmd/3` are available with the following additions:
+
+  * {`log_output`, level} - Logs anything that the command sends to stdout
   """
 
   defmodule State do
     @moduledoc false
 
-    defstruct [:command, :port, :group]
+    defstruct [:command, :port, :group, :log_output]
   end
 
   def child_spec(opts) do
@@ -71,14 +73,16 @@ defmodule MuonTrap.Daemon do
 
   def init([command, args, opts]) do
     group = Keyword.get(opts, :group)
+    logging = Keyword.get(opts, :log_output)
+    opts = Keyword.drop(opts, [:log_output])
 
     {muontrap_args, leftover_opts} = Options.to_args(opts)
     updated_args = muontrap_args ++ ["--", command] ++ args
 
-    port_options = [:exit_status, {:args, updated_args} | leftover_opts]
+    port_options = [:exit_status, {:args, updated_args}, {:line, 256} | leftover_opts]
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
-    {:ok, %State{command: command, port: port, group: group}}
+    {:ok, %State{command: command, port: port, group: group, log_output: logging}}
   end
 
   def handle_call({:cgget, controller, variable_name}, _from, state) do
@@ -96,13 +100,21 @@ defmodule MuonTrap.Daemon do
     {:reply, os_pid, state}
   end
 
-  def handle_info({port, {:data, message}}, %State{port: port} = state) do
-    Logger.debug("MuonTrap.Daemon(#{state.command}): #{inspect(message)}")
+  def handle_info({_port, {:data, _}}, %State{log_output: nil} = state) do
+    # Ignore output
+    {:noreply, state}
+  end
+
+  def handle_info(
+        {port, {:data, {_, message}}},
+        %State{port: port, log_output: log_level} = state
+      ) do
+    Logger.log(log_level, "#{state.command}: #{message}")
     {:noreply, state}
   end
 
   def handle_info({port, {:exit_status, status}}, %State{port: port} = state) do
-    Logger.error("MuonTrap.Daemon(#{state.command}): Process exited with status #{status}")
+    Logger.error("#{state.command}: Process exited with status #{status}")
     {:stop, :normal, state}
   end
 end

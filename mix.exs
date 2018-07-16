@@ -4,7 +4,7 @@ defmodule MuonTrap.MixProject do
   def project do
     [
       app: :muontrap,
-      version: "0.3.1",
+      version: "0.4.0",
       elixir: "~> 1.6",
       description: "Keep your ports contained",
       source_url: "https://github.com/fhunleth/muontrap",

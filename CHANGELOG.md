@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.0
+
+* New features
+  * MuonTrap.Daemon no longer sends all of the output from the process to the
+    logger by default. If you want it logged, pass in a `{:log_output, level}`
+    option. This also slightly improves the logged message to make it easier
+    to read.
+
 ## v0.3.1
 
 * Bug fixes

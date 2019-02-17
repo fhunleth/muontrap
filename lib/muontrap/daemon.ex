@@ -50,25 +50,25 @@ defmodule MuonTrap.Daemon do
   @doc """
   Get the value of the specified cgroup variable.
   """
-  @spec cgget(pid(), binary(), binary()) :: binary()
-  def cgget(pid, controller, variable_name) do
-    GenServer.call(pid, {:cgget, controller, variable_name})
+  @spec cgget(GenServer.server(), binary(), binary()) :: binary()
+  def cgget(server, controller, variable_name) do
+    GenServer.call(server, {:cgget, controller, variable_name})
   end
 
   @doc """
   Modify a cgroup variable.
   """
-  @spec cgset(pid(), binary(), binary(), binary()) :: :ok | no_return()
-  def cgset(pid, controller, variable_name, value) do
-    GenServer.call(pid, {:cgset, controller, variable_name, value})
+  @spec cgset(GenServer.server(), binary(), binary(), binary()) :: :ok | no_return()
+  def cgset(server, controller, variable_name, value) do
+    GenServer.call(server, {:cgset, controller, variable_name, value})
   end
 
   @doc """
   Return the OS pid to the muontrap executable.
   """
-  @spec os_pid(pid()) :: non_neg_integer()
-  def os_pid(pid) do
-    GenServer.call(pid, :os_pid)
+  @spec os_pid(GenServer.server()) :: non_neg_integer()
+  def os_pid(server) do
+    GenServer.call(server, :os_pid)
   end
 
   def init([command, args, opts]) do
@@ -109,12 +109,12 @@ defmodule MuonTrap.Daemon do
         {port, {:data, {_, message}}},
         %State{port: port, log_output: log_level} = state
       ) do
-    Logger.log(log_level, "#{state.command}: #{message}")
+    _ = Logger.log(log_level, "#{state.command}: #{message}")
     {:noreply, state}
   end
 
   def handle_info({port, {:exit_status, status}}, %State{port: port} = state) do
-    Logger.error("#{state.command}: Process exited with status #{status}")
+    _ = Logger.error("#{state.command}: Process exited with status #{status}")
     {:stop, :normal, state}
   end
 end

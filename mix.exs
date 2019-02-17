@@ -16,7 +16,7 @@ defmodule MuonTrap.MixProject do
       make_targets: ["all"],
       make_clean: ["clean"],
       dialyzer: [
-        flags: [:error_handling, :race_conditions, :underspecs]
+        flags: [:unmatched_returns, :error_handling, :race_conditions, :underspecs]
       ],
       package: package()
     ]

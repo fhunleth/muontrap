@@ -70,7 +70,7 @@ defmodule MuonTrap do
               "cannot execute #{operation} for program with null byte, got: #{inspect(binary)}"
 
       :nomatch ->
-        binary
+        :ok
     end
   end
 end

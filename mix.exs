@@ -11,7 +11,9 @@ defmodule MuonTrap.MixProject do
       docs: [extras: ["README.md"], main: "readme"],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: [:elixir_make] ++ Mix.compilers(),
+      build_embedded: true,
+      compilers: [:elixir_make | Mix.compilers()],
+      make_targets: ["all"],
       make_clean: ["clean"],
       package: package()
     ]
@@ -23,8 +25,9 @@ defmodule MuonTrap.MixProject do
 
   defp deps() do
     [
-      {:elixir_make, "~> 0.4", runtime: false},
-      {:ex_doc, "~> 0.11", only: :dev}
+      {:elixir_make, "~> 0.5", runtime: false},
+      {:ex_doc, "~> 0.19", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.0.0-rc.4", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -40,7 +43,6 @@ defmodule MuonTrap.MixProject do
         "LICENSE",
         "CHANGELOG.md"
       ],
-      maintainers: ["Frank Hunleth"],
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/fhunleth/muontrap"}
     ]

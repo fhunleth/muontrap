@@ -1,9 +1,21 @@
-# Variables to override
+# Makefile for building the muontrap port process"
 #
-# CC            C compiler
-# CROSSCOMPILE	crosscompiler prefix, if any
-# CFLAGS	compiler flags for compiling all C files
-# LDFLAGS	linker flags for linking all binaries
+# Makefile targets:
+#
+# all/install   build and install
+# clean         clean build products and intermediates
+#
+# Variables to override:
+#
+# MIX_COMPILE_PATH path to the build's ebin directory
+# CC            C compiler. MUST be set if crosscompiling
+# CFLAGS        compiler flags for compiling all C files
+# LDFLAGS       linker flags for linking all binaries
+
+PREFIX = $(MIX_COMPILE_PATH)/../priv
+BUILD  = $(MIX_COMPILE_PATH)/../obj
+
+MUONTRAP = $(PREFIX)/muontrap
 
 LDFLAGS +=
 CFLAGS ?= -O2 -Wall -Wextra -Wno-unused-parameter
@@ -11,22 +23,31 @@ CFLAGS += -std=c99 -D_GNU_SOURCE
 
 #CFLAGS += -DDEBUG
 
-SRC=$(wildcard *.c)
-OBJ=$(SRC:.c=.o)
+SRC = $(wildcard *.c)
+OBJ = $(SRC:%.c=$(BUILD)/%.o)
 
-.PHONY: all clean
+calling_from_make:
+	cd .. && mix compile
 
-all: ../priv ../priv/muontrap
+all: install
 
-%.o: %.c
+install: $(PREFIX) $(BUILD) $(MUONTRAP)
+
+$(OBJ): Makefile
+
+$(BUILD)/%.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-../priv:
-	mkdir ../priv
-
-../priv/muontrap: $(OBJ)
+$(MUONTRAP): $(OBJ)
 	$(CC) $^ $(LDFLAGS) -o $@
 
+$(PREFIX):
+	mkdir -p $@
+
+$(BUILD):
+	mkdir -p $@
+
 clean:
-	rm -f ../priv/muontrap *.o
-	-rmdir ../priv
+	$(RM) $(MUONTRAP) $(BUILD)/*.o
+
+.PHONY: all clean calling_from_make install

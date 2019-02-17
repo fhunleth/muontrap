@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.1
+
+* Improvements
+  * Move port process build products under `_build`. This fixes an issue where
+    changes in MIX_TARGET settings would not be picked up.
+  * Improved some specs to remove Dialyzer warnings in some cases
+
 ## v0.4.0
 
 * New features

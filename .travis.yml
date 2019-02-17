@@ -20,7 +20,7 @@ matrix:
           compiler: clang
 
 env:
-  - ELIXIR_VERSION=1.6.1 ERLANG_VERSION=20.1
+  - ELIXIR_VERSION=1.8.1-otp-21 ERLANG_VERSION=21.2
 
 before_install:
     - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
@@ -31,8 +31,8 @@ before_install:
         mkdir -p ~/otp && tar -xf erlang-$ERLANG_VERSION-nonroot.tar.bz2 -C ~/otp/;
         mkdir -p ~/.kerl;
         source $HOME/otp/$ERLANG_VERSION/activate;
-        wget https://github.com/elixir-lang/elixir/releases/download/v$ELIXIR_VERSION/Precompiled.zip;
-        unzip -d elixir Precompiled.zip;
+        wget https://repo.hex.pm/builds/elixir/v$ELIXIR_VERSION.zip;
+        unzip -d elixir v$ELIXIR_VERSION.zip;
       else
         brew update;
         brew install elixir;
@@ -48,3 +48,4 @@ script:
   - mix test
   - mix docs
   - mix format --check-formatted
+  - mix hex.build

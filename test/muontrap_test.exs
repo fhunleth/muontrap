@@ -73,7 +73,7 @@ defmodule MuonTrapTest do
   test "cmd/3 (with options)" do
     opts = [
       into: [],
-      cd: System.cwd!(),
+      cd: File.cwd!(),
       env: %{"foo" => "bar", "baz" => nil},
       arg0: "echo",
       stderr_to_stdout: true,
@@ -99,7 +99,7 @@ defmodule MuonTrapTest do
       end
 
       assert {"hello\n", 0} =
-               MuonTrap.cmd(Path.join(System.cwd!(), @echo), ["hello"], [{:arg0, "echo"}])
+               MuonTrap.cmd(Path.join(File.cwd!(), @echo), ["hello"], [{:arg0, "echo"}])
     end)
   after
     File.rm_rf!(@tmp_path)

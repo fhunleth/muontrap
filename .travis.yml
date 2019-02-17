@@ -49,3 +49,4 @@ script:
   - mix docs
   - mix format --check-formatted
   - mix hex.build
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then mkdir -p ~/.mix; mix dialyzer --halt-exit-status; fi

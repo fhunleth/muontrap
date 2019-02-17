@@ -15,6 +15,9 @@ defmodule MuonTrap.MixProject do
       compilers: [:elixir_make | Mix.compilers()],
       make_targets: ["all"],
       make_clean: ["clean"],
+      dialyzer: [
+        flags: [:error_handling, :race_conditions, :underspecs]
+      ],
       package: package()
     ]
   end

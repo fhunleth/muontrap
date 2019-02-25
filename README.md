@@ -3,8 +3,6 @@
 [![Build Status](https://travis-ci.org/fhunleth/muontrap.svg?branch=master)](https://travis-ci.org/fhunleth/muontrap)
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
 
---> Under active development - expect some API changes, but it's good enough for experimental use <--
-
 Keep programs, deamons, and applications launched from Erlang and Elixir
 contained and well-behaved. This lightweight library kills OS processes if the
 Elixir process running them crashes and if you're running on Linux, it can use

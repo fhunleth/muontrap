@@ -104,4 +104,12 @@ defmodule MuonTrapTest do
   after
     File.rm_rf!(@tmp_path)
   end
+
+  test "README.md version is up to date" do
+    app = :muontrap
+    app_version = Application.spec(app, :vsn) |> to_string()
+    readme = File.read!("README.md")
+    [_, readme_version] = Regex.run(~r/{:#{app}, "(.+)"}/, readme)
+    assert Version.match?(app_version, readme_version)
+  end
 end

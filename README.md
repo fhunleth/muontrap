@@ -77,13 +77,13 @@ to add, but you'll probably be happier with other solutions like
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `muontrap` to your list of dependencies in `mix.exs`:
+The package can be installed by adding `muontrap` to your list of dependencies
+in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:muontrap, "~> 0.2"}
+    {:muontrap, "~> 0.4"}
   ]
 end
 ```
@@ -194,3 +194,12 @@ If part of the startup of your command involves an initialization sequence, you
 may want to manually  call `MuonTrap.Daemon.start_link/3` so that if anything
 happens to the command or your Elixir code that it gets restarted and
 reinitialized automatically.
+
+## muontrap development
+
+In order to run the tests, some additional tools need to be installed. Specifically the `cgcreate` and `cgget` binaries need to be installed (and available on `$PATH`). Typically the package may be called `cgroup-tools` (on arch linux you need to install the `libcgroup` aur package).
+
+Then run:
+```
+sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test
+```

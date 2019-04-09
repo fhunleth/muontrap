@@ -17,10 +17,12 @@ defmodule DaemonTest do
   end
 
   test "exiting the process ends the daemon" do
-    {:ok, pid} = GenServer.start(Daemon, ["echo", ["hello"], []])
+    assert capture_log(fn ->
+      {:ok, pid} = GenServer.start(Daemon, ["echo", ["hello"], []])
 
-    wait_for_close_check()
-    refute Process.alive?(pid)
+      wait_for_close_check()
+      refute Process.alive?(pid)
+    end) =~ "[error] echo: Process exited with status 0"
   end
 
   test "daemon logs output when told" do

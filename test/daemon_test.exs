@@ -44,4 +44,16 @@ defmodule DaemonTest do
 
     refute capture_log(fun) =~ "hello"
   end
+
+  test "daemon logs output to stderr when told" do
+    opts = [log_output: :error, stderr_to_stdout: true]
+
+    fun = fn ->
+      {:ok, _pid} = GenServer.start(Daemon, ["test/echo_stderr.test", [], opts])
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "stderr message"
+  end
 end

@@ -21,6 +21,7 @@ defmodule MuonTrap.Daemon do
   The same options as `MuonTrap.cmd/3` are available with the following additions:
 
   * {`log_output`, level} - Logs anything that the command sends to stdout
+  * {`stderr_to_stdout`, boolean} - If `true` redirect stderr to stdout, default `false`
   """
 
   defmodule State do
@@ -74,7 +75,10 @@ defmodule MuonTrap.Daemon do
   def init([command, args, opts]) do
     group = Keyword.get(opts, :group)
     logging = Keyword.get(opts, :log_output)
-    opts = Keyword.drop(opts, [:log_output])
+    stderr_to_stdout = Keyword.get(opts, :stderr_to_stdout, false)
+    opts = Keyword.drop(opts, [:log_output, :stderr_to_stdout])
+
+    opts = add_stderr_to_stdout(opts, stderr_to_stdout)
 
     {muontrap_args, leftover_opts} = Options.to_args(opts)
     updated_args = muontrap_args ++ ["--", command] ++ args
@@ -117,4 +121,7 @@ defmodule MuonTrap.Daemon do
     _ = Logger.error("#{state.command}: Process exited with status #{status}")
     {:stop, :normal, state}
   end
+
+  defp add_stderr_to_stdout(opts, true), do: [:stderr_to_stdout | opts]
+  defp add_stderr_to_stdout(opts, false), do: opts
 end

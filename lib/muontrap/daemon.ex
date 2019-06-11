@@ -20,8 +20,8 @@ defmodule MuonTrap.Daemon do
 
   The same options as `MuonTrap.cmd/3` are available with the following additions:
 
-  * {`log_output`, level} - Logs anything that the command sends to stdout
-  * {`stderr_to_stdout`, boolean} - If `true` redirect stderr to stdout, default `false`
+  * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
+  * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
   """
 
   defmodule State do

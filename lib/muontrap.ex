@@ -10,12 +10,12 @@ defmodule MuonTrap do
 
    # Options
 
-     * :cgroup_controllers - run the command under the specified cgroup controllers. Defaults to [].
-     * :cgroup_path - use the specified path for the cgroup
-     * :cgroup_sets - set a cgroup controller parameter before running the command
-     * :delay_to_sigkill - milliseconds before sending a SIGKILL to a child process if it doesn't exit with a SIGTERM
-     * :uid - run the command using the specified uid or username
-     * :gid - run the command using the specified gid or group
+     * `:cgroup_controllers` - run the command under the specified cgroup controllers. Defaults to `[]`.
+     * `:cgroup_path` - use the specified path for the cgroup
+     * `:cgroup_sets` - set a cgroup controller parameter before running the command
+     * `:delay_to_sigkill` - milliseconds before sending a SIGKILL to a child process if it doesn't exit with a SIGTERM
+     * `:uid` - run the command using the specified uid or username
+     * `:gid` - run the command using the specified gid or group
 
    See `System.cmd/3` for additional options.
 

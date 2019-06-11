@@ -30,6 +30,16 @@ defmodule MuonTrap.Daemon do
     defstruct [:command, :port, :group, :log_output]
   end
 
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, opts},
+      type: :worker,
+      restart: :permanent,
+      shutdown: 500
+    }
+  end
+
   @doc """
   Start/link a deamon GenServer for the specified command.
   """

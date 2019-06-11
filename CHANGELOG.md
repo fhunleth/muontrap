@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.2
+
+* New features
+  * MuonTrap.Daemon can log stderr now as well as stdout. Pass
+    `stderr_to_stdout: true` in the options. Thanks to Timmo Verlaan for this
+    update.
+
 ## v0.4.1
 
 * Improvements

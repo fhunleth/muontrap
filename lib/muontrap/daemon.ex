@@ -72,6 +72,7 @@ defmodule MuonTrap.Daemon do
     GenServer.call(server, :os_pid)
   end
 
+  @impl true
   def init([command, args, opts]) do
     group = Keyword.get(opts, :group)
     logging = Keyword.get(opts, :log_output)
@@ -89,26 +90,31 @@ defmodule MuonTrap.Daemon do
     {:ok, %State{command: command, port: port, group: group, log_output: logging}}
   end
 
+  @impl true
   def handle_call({:cgget, controller, variable_name}, _from, state) do
     result = System.cmd("cat", ["/sys/fs/cgroups/#{controller}/#{state.group}/#{variable_name}"])
     {:reply, result, state}
   end
 
+  @impl true
   def handle_call({:cgset, controller, variable_name, value}, _from, state) do
     result = File.write!("/sys/fs/cgroups/#{controller}/#{state.group}/#{variable_name}", value)
     {:reply, result, state}
   end
 
+  @impl true
   def handle_call(:os_pid, _from, state) do
     {:os_pid, os_pid} = Port.info(state.port, :os_pid)
     {:reply, os_pid, state}
   end
 
+  @impl true
   def handle_info({_port, {:data, _}}, %State{log_output: nil} = state) do
     # Ignore output
     {:noreply, state}
   end
 
+  @impl true
   def handle_info(
         {port, {:data, {_, message}}},
         %State{port: port, log_output: log_level} = state
@@ -117,6 +123,7 @@ defmodule MuonTrap.Daemon do
     {:noreply, state}
   end
 
+  @impl true
   def handle_info({port, {:exit_status, status}}, %State{port: port} = state) do
     _ = Logger.error("#{state.command}: Process exited with status #{status}")
     {:stop, :normal, state}

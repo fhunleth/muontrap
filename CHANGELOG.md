@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.3
+
+* Bug fixes
+  * Reverted removal of `child_spec`
+
 ## v0.4.2
 
 * New features

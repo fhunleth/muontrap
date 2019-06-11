@@ -197,9 +197,13 @@ reinitialized automatically.
 
 ## muontrap development
 
-In order to run the tests, some additional tools need to be installed. Specifically the `cgcreate` and `cgget` binaries need to be installed (and available on `$PATH`). Typically the package may be called `cgroup-tools` (on arch linux you need to install the `libcgroup` aur package).
+In order to run the tests, some additional tools need to be installed.
+Specifically the `cgcreate` and `cgget` binaries need to be installed (and
+available on `$PATH`). Typically the package may be called `cgroup-tools` (on
+arch linux you need to install the `libcgroup` aur package).
 
 Then run:
-```
+
+```sh
 sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test
 ```

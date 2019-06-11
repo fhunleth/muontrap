@@ -4,23 +4,23 @@ language: c
 sudo: required
 dist: trusty
 
-os:
-    - linux
-    - osx
-
-compiler:
-    - gcc
-    - clang
-
 matrix:
-    exclude:
-        - os: osx
-          compiler: gcc
-        - os: linux
-          compiler: clang
-
-env:
-  - ELIXIR_VERSION=1.8.1-otp-21 ERLANG_VERSION=21.2
+    include:
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.8.2-otp-22 ERLANG_VERSION=22.0 DOCS=true DIALYZER=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.8.2-otp-21 ERLANG_VERSION=21.3 DOCS=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.7.4-otp-21 ERLANG_VERSION=21.3 DOCS=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.6.6-otp-20 ERLANG_VERSION=20.3.8
+    - os: osx
+      compiler: clang
+      env: DOCS=true
 
 before_install:
     - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
@@ -46,7 +46,7 @@ script:
   - mix deps.get
   - mix compile
   - mix test
-  - mix docs
+  - if [ "$DOCS" = "true"; then mix docs; fi
   - mix format --check-formatted
   - mix hex.build
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then mkdir -p ~/.mix; mix dialyzer --halt-exit-status; fi
+  - if [ "$DIALYZER" = "true" ]; then mkdir -p ~/.mix; mix dialyzer --halt-exit-status; fi

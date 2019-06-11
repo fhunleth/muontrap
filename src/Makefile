@@ -1,4 +1,4 @@
-# Makefile for building the muontrap port process"
+# Makefile for building the muontrap port process
 #
 # Makefile targets:
 #

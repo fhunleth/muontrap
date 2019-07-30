@@ -85,7 +85,12 @@ defmodule MuonTrap.Daemon do
     updated_args = muontrap_args ++ ["--", command] ++ args
 
     port_options = [:exit_status, {:args, updated_args}, {:line, 256} | leftover_opts]
-    port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
+
+    port =
+      Port.open(
+        {:spawn_executable, to_charlist(MuonTrap.muontrap_path())},
+        validate_port_opts(port_options)
+      )
 
     {:ok, %State{command: command, port: port, group: group, log_output: logging}}
   end
@@ -131,4 +136,33 @@ defmodule MuonTrap.Daemon do
 
   defp add_stderr_to_stdout(opts, true), do: [:stderr_to_stdout | opts]
   defp add_stderr_to_stdout(opts, false), do: opts
+
+  defp validate_port_opts([]), do: []
+
+  defp validate_port_opts(opts) do
+    validate_port_opts(opts, [])
+  end
+
+  defp validate_port_opts([], opts), do: opts
+
+  defp validate_port_opts([{:env, env} | rest], opts) do
+    validate_port_opts(rest, [{:env, validate_env(env)} | opts])
+  end
+
+  defp validate_port_opts([opt | rest], opts) do
+    validate_port_opts(rest, [opt | opts])
+  end
+
+  defp validate_env(enum) do
+    Enum.map(enum, fn
+      {k, nil} ->
+        {String.to_charlist(k), false}
+
+      {k, v} ->
+        {String.to_charlist(k), String.to_charlist(v)}
+
+      other ->
+        raise ArgumentError, "invalid environment key-value #{inspect(other)}"
+    end)
+  end
 end

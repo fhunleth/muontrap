@@ -1,14 +1,17 @@
 defmodule MuonTrap.MixProject do
   use Mix.Project
 
+  @version "0.4.3"
+  @source_url "https://github.com/fhunleth/muontrap"
+
   def project do
     [
       app: :muontrap,
-      version: "0.4.3",
+      version: @version,
       elixir: "~> 1.6",
       description: "Keep your ports contained",
-      source_url: "https://github.com/fhunleth/muontrap",
-      docs: [extras: ["README.md"], main: "readme"],
+      source_url: @source_url,
+      docs: docs(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       build_embedded: true,
@@ -34,6 +37,15 @@ defmodule MuonTrap.MixProject do
     ]
   end
 
+  defp docs do
+    [
+      extras: ["README.md"],
+      main: "readme",
+      source_ref: "v#{@version}",
+      source_url: @source_url
+    ]
+  end
+
   defp package() do
     [
       files: [
@@ -47,7 +59,7 @@ defmodule MuonTrap.MixProject do
         "CHANGELOG.md"
       ],
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/fhunleth/muontrap"}
+      links: %{"GitHub" => @source_url}
     ]
   end
 end

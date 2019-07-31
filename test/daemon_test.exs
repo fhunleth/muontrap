@@ -56,4 +56,20 @@ defmodule DaemonTest do
 
     assert capture_log(fun) =~ "stderr message"
   end
+
+  test "can pass environment variables to the daemon" do
+    fun = fn ->
+      {:ok, _pid} =
+        GenServer.start(Daemon, [
+          "env",
+          [],
+          [log_output: :error, env: [{"MUONTRAP_TEST_VAR", "HELLO_THERE"}]]
+        ])
+
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "MUONTRAP_TEST_VAR=HELLO_THERE"
+  end
 end

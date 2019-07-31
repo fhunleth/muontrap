@@ -83,14 +83,11 @@ defmodule MuonTrap.Daemon do
 
     {muontrap_args, leftover_opts} = Options.to_args(opts)
     updated_args = muontrap_args ++ ["--", command] ++ args
+    updated_opts = validate_port_opts(leftover_opts)
 
-    port_options = [:exit_status, {:args, updated_args}, {:line, 256} | leftover_opts]
+    port_options = [:exit_status, {:args, updated_args}, {:line, 256} | updated_opts]
 
-    port =
-      Port.open(
-        {:spawn_executable, to_charlist(MuonTrap.muontrap_path())},
-        validate_port_opts(port_options)
-      )
+    port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
     {:ok, %State{command: command, port: port, group: group, log_output: logging}}
   end
@@ -137,6 +134,7 @@ defmodule MuonTrap.Daemon do
   defp add_stderr_to_stdout(opts, true), do: [:stderr_to_stdout | opts]
   defp add_stderr_to_stdout(opts, false), do: opts
 
+  # See System.cmd/3 implementation
   defp validate_port_opts([]), do: []
 
   defp validate_port_opts(opts) do

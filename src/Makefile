@@ -7,13 +7,13 @@
 #
 # Variables to override:
 #
-# MIX_COMPILE_PATH path to the build's ebin directory
+# MIX_APP_PATH  path to the build directory
 # CC            C compiler. MUST be set if crosscompiling
 # CFLAGS        compiler flags for compiling all C files
 # LDFLAGS       linker flags for linking all binaries
 
-PREFIX = $(MIX_COMPILE_PATH)/../priv
-BUILD  = $(MIX_COMPILE_PATH)/../obj
+PREFIX = $(MIX_APP_PATH)/priv
+BUILD  = $(MIX_APP_PATH)/obj
 
 MUONTRAP = $(PREFIX)/muontrap
 
@@ -41,10 +41,7 @@ $(BUILD)/%.o: %.c
 $(MUONTRAP): $(OBJ)
 	$(CC) $^ $(LDFLAGS) -o $@
 
-$(PREFIX):
-	mkdir -p $@
-
-$(BUILD):
+$(PREFIX) $(BUILD):
 	mkdir -p $@
 
 clean:

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.4
+
+* Bug fixes
+  * Fixed an issue where environment variable lists passed to MuonTrap.Daemon
+    had to be charlists rather than Elixir strings like MuonTrap.cmd/3 and
+    System.cmd/3.
+
 ## v0.4.3
 
 * Bug fixes

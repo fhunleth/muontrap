@@ -8,7 +8,7 @@ defmodule MuonTrapTest.Case do
     end
   end
 
-  @timeout_before_close_check 10
+  @timeout_before_close_check 20
 
   @spec cpu_cgroup_exists(String.t()) :: boolean
   def cpu_cgroup_exists(path) do

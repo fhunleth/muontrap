@@ -32,7 +32,7 @@ defmodule MuonTrap.Daemon do
   defmodule State do
     @moduledoc false
 
-    defstruct [:command, :port, :group, :log_output]
+    defstruct [:command, :port, :cgroup_path, :log_output]
   end
 
   def child_spec([command, args]) do
@@ -91,33 +91,39 @@ defmodule MuonTrap.Daemon do
 
   @impl true
   def init([command, args, opts]) do
-    group = Keyword.get(opts, :group)
-    logging = Keyword.get(opts, :log_output)
-    stderr_to_stdout = Keyword.get(opts, :stderr_to_stdout, false)
-    opts = Keyword.drop(opts, [:log_output, :stderr_to_stdout])
+    cgroup_path = Keyword.get(opts, :cgroup_path)
 
-    opts = add_stderr_to_stdout(opts, stderr_to_stdout)
+    {logging, opts} = Keyword.pop(opts, :log_output)
+    {stderr_to_stdout, opts} = Keyword.pop(opts, :stderr_to_stdout, false)
 
     {muontrap_args, leftover_opts} = Options.to_args(opts)
     updated_args = muontrap_args ++ ["--", command] ++ args
-    updated_opts = validate_port_opts(leftover_opts)
+
+    updated_opts =
+      leftover_opts
+      |> validate_port_opts()
+      |> add_stderr_to_stdout(stderr_to_stdout)
 
     port_options = [:exit_status, {:args, updated_args}, {:line, 256} | updated_opts]
 
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
-    {:ok, %State{command: command, port: port, group: group, log_output: logging}}
+    {:ok, %State{command: command, port: port, cgroup_path: cgroup_path, log_output: logging}}
   end
 
   @impl true
   def handle_call({:cgget, controller, variable_name}, _from, state) do
-    result = System.cmd("cat", ["/sys/fs/cgroups/#{controller}/#{state.group}/#{variable_name}"])
+    result =
+      System.cmd("cat", ["/sys/fs/cgroups/#{controller}/#{state.cgroup_path}/#{variable_name}"])
+
     {:reply, result, state}
   end
 
   @impl true
   def handle_call({:cgset, controller, variable_name, value}, _from, state) do
-    result = File.write!("/sys/fs/cgroups/#{controller}/#{state.group}/#{variable_name}", value)
+    result =
+      File.write!("/sys/fs/cgroups/#{controller}/#{state.cgroup_path}/#{variable_name}", value)
+
     {:reply, result, state}
   end
 

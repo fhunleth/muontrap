@@ -229,39 +229,32 @@ static void destroy_cgroups()
     }
 }
 
-static void procfile_killall(const char *group_path, int sig)
+static int procfile_killall(const char *group_path, int sig)
 {
+    int children_killed = 0;
+
     FILE *fp = fopen(group_path, "r");
     if (!fp)
-        return;
+        return children_killed;
 
     int pid;
     while (fscanf(fp, "%d", &pid) == 1) {
         INFO("  kill -%d %d", sig, pid);
         kill(pid, sig);
+        children_killed++;
     }
     fclose(fp);
+    return children_killed;
 }
 
-static int procfile_has_processes(const char *group_path)
+static int kill_children(int sig)
 {
-    FILE *fp = fopen(group_path, "r");
-    if (!fp)
-        return 0;
-
-    int pid;
-    int rc = fscanf(fp, "%d", &pid);
-    fclose(fp);
-
-    return rc == 1;
-}
-
-static void kill_children(int sig)
-{
+    int children_killed = 0;
     FOREACH_CONTROLLER {
         INFO("killall -%d from %s", sig, controller->procfile);
-        procfile_killall(controller->procfile, sig);
+        children_killed += procfile_killall(controller->procfile, sig);
     }
+    return children_killed;
 }
 
 static void finish_controller_init()
@@ -270,15 +263,6 @@ static void finish_controller_init()
         checked_asprintf(&controller->group_path, "%s/%s/%s", CGROUP_MOUNT_PATH, controller->name, cgroup_path);
         checked_asprintf(&controller->procfile, "%s/cgroup.procs", controller->group_path);
     }
-}
-
-static int child_processes_exist()
-{
-    FOREACH_CONTROLLER {
-        if (procfile_has_processes(controller->procfile))
-            return 1;
-    }
-    return 0;
 }
 
 static void cleanup()
@@ -291,8 +275,7 @@ static void cleanup()
     // nothing exists, but if subprocesses do exist, repeatedly
     // kill them until they all go away.
     int retries = 10;
-    while (retries > 0 && child_processes_exist()) {
-        kill_children(SIGKILL);
+    while (retries > 0 && kill_children(SIGKILL) > 0) {
         usleep(1000);
         retries--;
     }
@@ -300,8 +283,7 @@ static void cleanup()
     if (retries == 0) {
         // Hammer the child processes as a final attempt (no waiting this time)
         retries = 10;
-        while (retries > 0 && child_processes_exist()) {
-            kill_children(SIGKILL);
+        while (retries > 0 && kill_children(SIGKILL) > 0) {
             retries--;
         }
 

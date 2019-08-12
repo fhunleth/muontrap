@@ -484,7 +484,7 @@ int main(int argc, char *argv[])
     finish_controller_init();
 
     if (pipe(signal_pipe) < 0)
-        err(EXIT_FAILURE, "pipeenable");
+        err(EXIT_FAILURE, "pipe");
 
     enable_signals();
     atexit(cleanup);

@@ -11,15 +11,20 @@ defmodule MuonTrap.Daemon do
 
   ```elixir
   children = [
-    {MuonTrap.Daemon, ["my_server", ["--options", "foo")], [cd: "/some_directory"]]}
+    {MuonTrap.Daemon, ["my_server", ["--options", "foo")], [id: :my_daemon, cd: "/some_directory"]]}
   ]
 
   opts = [strategy: :one_for_one, name: MyApplication.Supervisor]
   Supervisor.start_link(children, opts)
   ```
 
-  The same options as `MuonTrap.cmd/3` are available with the following additions:
+  In the `child_spec` tuple, the second element is a list that corresponds to the
+  `MuonTrap.cmd/3` parameters. I.e., The first item in the list is the program to
+  run, the second is a list of commandline arguments, and the third is a list of
+  options. The same options as `MuonTrap.cmd/3` are available with the following additions:
 
+  * `:id` - Use the specified `id` in the supervision tree (defaults to `MuonTrap.Daemon`)
+  * `:name` - Name the Daemon GenServer
   * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
   """
@@ -30,10 +35,16 @@ defmodule MuonTrap.Daemon do
     defstruct [:command, :port, :group, :log_output]
   end
 
-  def child_spec(opts) do
+  def child_spec([command, args]) do
+    child_spec([command, args, []])
+  end
+
+  def child_spec([command, args, opts]) do
+    {id, opts} = Keyword.pop(opts, :id, __MODULE__)
+
     %{
-      id: __MODULE__,
-      start: {__MODULE__, :start_link, opts},
+      id: id,
+      start: {__MODULE__, :start_link, [command, args, opts]},
       type: :worker,
       restart: :permanent,
       shutdown: 500
@@ -45,7 +56,13 @@ defmodule MuonTrap.Daemon do
   """
   @spec start_link(binary(), [binary()], keyword()) :: GenServer.on_start()
   def start_link(command, args, opts \\ []) do
-    GenServer.start_link(__MODULE__, [command, args, opts])
+    {genserver_opts, opts} =
+      case Keyword.pop(opts, :name) do
+        {nil, _opts} -> {[], opts}
+        {name, new_opts} -> {[name: name], new_opts}
+      end
+
+    GenServer.start_link(__MODULE__, [command, args, opts], genserver_opts)
   end
 
   @doc """

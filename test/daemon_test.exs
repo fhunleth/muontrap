@@ -1,19 +1,18 @@
 defmodule DaemonTest do
-  use ExUnit.Case
+  use MuonTrapTest.Case
   import ExUnit.CaptureLog
-  import MuonTrapTestHelpers
 
   alias MuonTrap.Daemon
 
   test "stopping the daemon kills the process" do
     {:ok, pid} = Daemon.start_link("test/do_nothing.test", [])
     os_pid = Daemon.os_pid(pid)
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
 
     GenServer.stop(pid)
 
     wait_for_close_check()
-    assert !is_os_pid_around?(os_pid)
+    assert_os_pid_exited(os_pid)
   end
 
   test "exiting the process ends the daemon" do

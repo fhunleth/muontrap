@@ -11,6 +11,7 @@ defmodule MuonTrap.MixProject do
       elixir: "~> 1.6",
       description: "Keep your ports contained",
       source_url: @source_url,
+      elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -24,6 +25,9 @@ defmodule MuonTrap.MixProject do
       package: package()
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   def application do
     [extra_applications: [:logger]]

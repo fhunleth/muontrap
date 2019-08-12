@@ -1,6 +1,5 @@
 defmodule MuonTrapTest do
-  use ExUnit.Case
-  import MuonTrapTestHelpers
+  use MuonTrapTest.Case
 
   doctest MuonTrap
 
@@ -9,12 +8,12 @@ defmodule MuonTrapTest do
       Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["./test/do_nothing.test"])
 
     os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
 
     Port.close(port)
 
     wait_for_close_check()
-    assert !is_os_pid_around?(os_pid)
+    assert_os_pid_exited(os_pid)
   end
 
   test "closing the port kills a process that ignores sigterm" do
@@ -37,17 +36,17 @@ defmodule MuonTrapTest do
       )
 
     os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
     Port.close(port)
 
     Process.sleep(100)
     # process should be around for 250ms, so it should be around here.
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
 
     Process.sleep(200)
 
     # Now it should be gone
-    assert !is_os_pid_around?(os_pid)
+    assert_os_pid_exited(os_pid)
   end
 
   # The following tests are copied from System.cmd to help ensure that

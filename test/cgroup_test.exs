@@ -1,6 +1,5 @@
 defmodule CgroupTest do
-  use ExUnit.Case
-  import MuonTrapTestHelpers
+  use MuonTrapTest.Case
 
   @tag :cgroup
   test "cgroup gets created and removed on exit" do
@@ -13,13 +12,13 @@ defmodule CgroupTest do
       )
 
     os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
     assert cpu_cgroup_exists(cgroup_path)
 
     Port.close(port)
 
     wait_for_close_check()
-    assert !is_os_pid_around?(os_pid)
+    assert_os_pid_exited(os_pid)
     assert !cpu_cgroup_exists(cgroup_path)
   end
 
@@ -34,13 +33,13 @@ defmodule CgroupTest do
       )
 
     os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
     assert cpu_cgroup_exists(cgroup_path)
 
     Port.close(port)
 
     wait_for_close_check()
-    assert !is_os_pid_around?(os_pid)
+    assert_os_pid_exited(os_pid)
     assert !cpu_cgroup_exists(cgroup_path)
   end
 end

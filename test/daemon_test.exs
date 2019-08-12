@@ -5,11 +5,15 @@ defmodule DaemonTest do
   alias MuonTrap.Daemon
 
   test "stopping the daemon kills the process" do
-    {:ok, pid} = Daemon.start_link("test/do_nothing.test", [])
+    {:ok, pid} =
+      start_supervised(
+        {Daemon, ["test/do_nothing.test", [], [id: :do_nothing, stderr_to_stdout: true]]}
+      )
+
     os_pid = Daemon.os_pid(pid)
     assert_os_pid_running(os_pid)
 
-    GenServer.stop(pid)
+    :ok = stop_supervised(:do_nothing)
 
     wait_for_close_check()
     assert_os_pid_exited(os_pid)
@@ -17,7 +21,8 @@ defmodule DaemonTest do
 
   test "exiting the process ends the daemon" do
     assert capture_log(fn ->
-             {:ok, pid} = GenServer.start(Daemon, ["echo", ["hello"], []])
+             {:ok, pid} =
+               start_supervised({Daemon, ["echo", ["hello"], [stderr_to_stdout: true]]})
 
              wait_for_close_check()
              refute Process.alive?(pid)
@@ -26,7 +31,11 @@ defmodule DaemonTest do
 
   test "daemon logs output when told" do
     fun = fn ->
-      {:ok, _pid} = GenServer.start(Daemon, ["echo", ["hello"], [log_output: :error]])
+      {:ok, _pid} =
+        start_supervised(
+          {Daemon, ["echo", ["hello"], [stderr_to_stdout: true, log_output: :error]]}
+        )
+
       wait_for_close_check()
       Logger.flush()
     end
@@ -36,7 +45,7 @@ defmodule DaemonTest do
 
   test "daemon doesn't log output by default" do
     fun = fn ->
-      {:ok, _pid} = GenServer.start(Daemon, ["echo", ["hello"], []])
+      {:ok, _pid} = start_supervised({Daemon, ["echo", ["hello"], [stderr_to_stdout: true]]})
       wait_for_close_check()
       Logger.flush()
     end
@@ -48,7 +57,7 @@ defmodule DaemonTest do
     opts = [log_output: :error, stderr_to_stdout: true]
 
     fun = fn ->
-      {:ok, _pid} = GenServer.start(Daemon, ["test/echo_stderr.test", [], opts])
+      {:ok, _pid} = start_supervised({Daemon, ["test/echo_stderr.test", [], opts]})
       wait_for_close_check()
       Logger.flush()
     end
@@ -59,13 +68,21 @@ defmodule DaemonTest do
   test "can pass environment variables to the daemon" do
     fun = fn ->
       {:ok, _pid} =
-        GenServer.start(Daemon, [
-          "env",
-          [],
-          [log_output: :error, env: [{"MUONTRAP_TEST_VAR", "HELLO_THERE"}]]
-        ])
+        start_supervised(
+          {Daemon,
+           [
+             "env",
+             [],
+             [
+               log_output: :error,
+               stderr_to_stdout: true,
+               env: [{"MUONTRAP_TEST_VAR", "HELLO_THERE"}]
+             ]
+           ]}
+        )
 
       wait_for_close_check()
+
       Logger.flush()
     end
 

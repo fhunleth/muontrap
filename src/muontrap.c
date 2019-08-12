@@ -15,8 +15,8 @@
 #include <unistd.h>
 
 #ifdef DEBUG
-static FILE *debugfp = NULL;
-#define INFO(MSG, ...) do { fprintf(debugfp, MSG "\n", ## __VA_ARGS__); fflush(debugfp); } while (0)
+static FILE *debug_fp = NULL;
+#define INFO(MSG, ...) do { fprintf(debug_fp, MSG "\n", ## __VA_ARGS__); fflush(debug_fp); } while (0)
 #else
 #define INFO(MSG, ...) ;
 #endif
@@ -56,8 +56,8 @@ struct controller_info {
 static struct controller_info *controllers = NULL;
 static const char *cgroup_path = NULL;
 static int brutal_kill_wait_us = 1000;
-static uid_t run_as_uid = 0; // 0 means don't set, since we don't support priviledge escalation
-static gid_t run_as_gid = 0; // 0 means don't set, since we don't support priviledge escalation
+static uid_t run_as_uid = 0; // 0 means don't set, since we don't support privilege escalation
+static gid_t run_as_gid = 0; // 0 means don't set, since we don't support privilege escalation
 
 static int signal_pipe[2] = { -1, -1};
 
@@ -76,8 +76,8 @@ static void usage()
     printf("--group,-g <cgroup path>\n");
     printf("--set,-s <cgroup variable>=<value>\n (may be specified multiple times)\n");
     printf("--delay-to-sigkill,-k <microseconds>\n");
-    printf("--uid <uid/user> drop priviledge to this uid or user\n");
-    printf("--gid <gid/group> drop priviledge to this gid or group\n");
+    printf("--uid <uid/user> drop privilege to this uid or user\n");
+    printf("--gid <gid/group> drop privilege to this gid or group\n");
     printf("-- the program to run and its arguments come after this\n");
 }
 
@@ -399,9 +399,9 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
     char filename[64];
     sprintf(filename, "muontrap-%d.log", getpid());
-    debugfp = fopen(filename, "w");
-    if (!debugfp)
-        debugfp = stderr;
+    debug_fp = fopen(filename, "w");
+    if (!debug_fp)
+        debug_fp = stderr;
 #endif
     INFO("muontrap argc=%d", argc);
     if (argc == 1) {

@@ -46,7 +46,7 @@ script:
   - mix deps.get
   - mix compile
   - mix test
-  - if [ "$DOCS" = "true"; then mix docs; fi
+  - if [ "$DOCS" = "true"; then MIX_ENV=docs mix docs; fi
   - mix format --check-formatted
-  - mix hex.build
+  - MIX_ENV=docs mix hex.build
   - if [ "$DIALYZER" = "true" ]; then mkdir -p ~/.mix; mix dialyzer --halt-exit-status; fi

@@ -21,11 +21,11 @@ defmodule MuonTrapTest do
       Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["test/ignore_sigterm.test"])
 
     os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
     Port.close(port)
 
     wait_for_close_check()
-    assert !is_os_pid_around?(os_pid)
+    assert_os_pid_exited(os_pid)
   end
 
   test "delaying the SIGKILL" do

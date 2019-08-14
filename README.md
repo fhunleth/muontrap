@@ -178,7 +178,7 @@ For many long running programs, you may want to restart them if they crash.
 Luckily Erlang already has mechanisms to do this. `MuonTrap` provides a
 `GenServer` called `MuonTrap.Daemon` that you can hook into one of your
 supervision trees.  For example, you could specify it like this in your
-application's supervisor::
+application's supervisor:
 
 ```elixir
   def start(_type, _args) do
@@ -191,10 +191,28 @@ application's supervisor::
   end
 ```
 
-If part of the startup of your command involves an initialization sequence, you
-may want to manually  call `MuonTrap.Daemon.start_link/3` so that if anything
-happens to the command or your Elixir code that it gets restarted and
-reinitialized automatically.
+Supervisors provide three restart strategies, `:permanent`, `:temporary`, and
+`:transient`. They work as follows:
+
+* `:permanent` - Always restart the command if it exits or crashes. Restarts are
+  limited to the Supervisor's restart intensity settings as they would be with
+  normal `GenServer`s. This is the default.
+* `:transient` - If the exit status of the command is 0 (i.e., success), then
+  don't restart. Any other exit status is considered an error and the command is
+  restarted.
+* `:temporary` - Don't restart
+
+If you're running more than one `MuonTrap.Daemon` under the same `Supervisor`,
+then you'll need to give each one a unique `:id`. Here's an example `child_spec`
+for setting the `:id` and the `:restart` parameters:
+
+```elixir
+    Supervisor.child_spec(
+        {MuonTrap.Daemon, ["command", ["arg1"], options]},
+         id: :my_daemon,
+         restart: :transient
+      )
+```
 
 ## muontrap development
 

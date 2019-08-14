@@ -150,8 +150,18 @@ defmodule MuonTrap.Daemon do
 
   @impl true
   def handle_info({port, {:exit_status, status}}, %State{port: port} = state) do
-    _ = Logger.error("#{state.command}: Process exited with status #{status}")
-    {:stop, :normal, state}
+    reason =
+      case status do
+        0 ->
+          _ = Logger.info("#{state.command}: Process exited successfully")
+          :normal
+
+        _failure ->
+          _ = Logger.error("#{state.command}: Process exited with status #{status}")
+          :error_exit_status
+      end
+
+    {:stop, reason, state}
   end
 
   defp add_stderr_to_stdout(opts, true), do: [:stderr_to_stdout | opts]

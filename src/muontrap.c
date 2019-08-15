@@ -232,7 +232,10 @@ static void destroy_cgroups()
         // Only remove the final directory, since we don't keep track of
         // what we actually create.
         INFO("rmdir %s", controller->group_path);
-        rmdir(controller->group_path);
+        if (rmdir(controller->group_path) < 0) {
+            INFO("Error removing %s (%s)", controller->group_path, strerror(errno));
+            warn("Error removing %s", controller->group_path);
+        }
     }
 }
 

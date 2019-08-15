@@ -16,7 +16,7 @@
 
 #ifdef DEBUG
 static FILE *debug_fp = NULL;
-#define INFO(MSG, ...) do { fprintf(debug_fp, MSG "\n", ## __VA_ARGS__); fflush(debug_fp); } while (0)
+#define INFO(MSG, ...) do { fprintf(debug_fp, "%d:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
 #else
 #define INFO(MSG, ...) ;
 #endif
@@ -79,6 +79,13 @@ static void usage()
     printf("--uid <uid/user> drop privilege to this uid or user\n");
     printf("--gid <gid/group> drop privilege to this gid or group\n");
     printf("-- the program to run and its arguments come after this\n");
+}
+
+static int microsecs()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (ts.tv_sec * 1000000) + (ts.tv_nsec / 1000);
 }
 
 void sigchild_handler(int signum)
@@ -295,13 +302,6 @@ static void cleanup()
     destroy_cgroups();
 
     INFO("cleanup done");
-}
-
-static int microsecs()
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (ts.tv_sec * 1000000) + (ts.tv_nsec / 1000);
 }
 
 static void kill_child_nicely(pid_t child)

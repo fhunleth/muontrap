@@ -308,7 +308,7 @@ static void kill_child_nicely(pid_t child)
 {
     // Start with SIGTERM
     int rc = kill(child, SIGTERM);
-    INFO("kill -%d %d -> %d (%s)", SIGTERM, child, rc, strerror(errno));
+    INFO("kill -%d %d -> %d (%s)", SIGTERM, child, rc, rc < 0 ? strerror(errno) : "success");
     if (rc < 0)
         return;
 

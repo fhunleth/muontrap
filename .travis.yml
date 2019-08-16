@@ -47,7 +47,7 @@ script:
   - mix deps.get
   - mix compile
   - mix test
-  - if [ "$COVERALLS" = "true" ]; then MIX_ENV=test mix coveralls.circle; fi
+  - if [ "$COVERALLS" = "true" ]; then MIX_ENV=test mix coveralls.travis; fi
   - if [ "$DOCS" = "true"; then MIX_ENV=docs mix docs; fi
   - mix format --check-formatted
   - MIX_ENV=docs mix hex.build

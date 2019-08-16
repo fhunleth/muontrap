@@ -267,6 +267,52 @@ static int kill_children(int sig)
     return children_killed;
 }
 
+static void read_proc_cmdline(int pid, char *cmdline)
+{
+    char *cmdline_filename;
+
+    checked_asprintf(&cmdline_filename, "/proc/%d/cmdline", pid);
+    FILE *fp = fopen(cmdline_filename, "r");
+    if (fp) {
+        size_t len = fread(cmdline, 1, 128, fp);
+        if (len > 0)
+            cmdline[len] = 0;
+        else
+            strcpy(cmdline, "<NULL>");
+        fclose(fp);
+    } else {
+        sprintf(cmdline, "Error reading %s", cmdline_filename);
+    }
+
+    free(cmdline_filename);
+}
+
+static void procfile_dump_children(const char *group_path)
+{
+    INFO("---Begin child list for %s", group_path);
+    FILE *fp = fopen(group_path, "r");
+    if (!fp) {
+        INFO("Error reading child list!");
+        return;
+    }
+
+    int pid;
+    while (fscanf(fp, "%d", &pid) == 1) {
+        char cmdline[129];
+        read_proc_cmdline(pid, cmdline);
+        INFO("  %d: %s", pid, cmdline);
+    }
+    fclose(fp);
+    INFO("---End child list for %s", group_path);
+}
+
+static void dump_all_children_from_cgroups()
+{
+    FOREACH_CONTROLLER {
+        procfile_dump_children(controller->procfile);
+    }
+}
+
 static void finish_controller_init()
 {
     FOREACH_CONTROLLER {
@@ -281,24 +327,28 @@ static void cleanup()
 
     disable_signals();
 
-    // If the subprocess responded to our SIGTERM, then hopefully
-    // nothing exists, but if subprocesses do exist, repeatedly
-    // kill them until they all go away.
-    int retries = 10;
-    while (retries > 0 && kill_children(SIGKILL) > 0) {
-        usleep(1000);
-        retries--;
-    }
+    // In order to cleanup the cgroup, all processes need to exit.
+    // The immediate child will have either exited or gotten a SIGTERM
+    // at this point. Its children can still be around, though.
 
-    if (retries == 0) {
-        // Hammer the child processes as a final attempt (no waiting this time)
-        retries = 10;
-        while (retries > 0 && kill_children(SIGKILL) > 0) {
-            retries--;
-        }
+    // Send a SIGTERM to all children
+    if (kill_children(SIGTERM) > 0) {
+       // If a child was found, give it a short chance to exit.
+       usleep(1000);
 
-        if (retries == 0)
-            warnx("Failed to kill all children even after retrying!");
+       // Now hammer the children with SIGKILLs to get them to go away.
+       int retries = 10;
+       while (retries > 0 && kill_children(SIGKILL) > 0) {
+           usleep(1000);
+           retries--;
+       }
+
+       if (retries == 0) {
+           warnx("Failed to kill all children even after retrying!");
+#ifdef DEBUG
+           dump_all_children_from_cgroups();
+#endif
+       }
     }
 
     // Clean up our cgroup

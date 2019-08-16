@@ -8,7 +8,7 @@ defmodule MuonTrap.MixProject do
     [
       app: :muontrap,
       version: @version,
-      elixir: "~> 1.6",
+      elixir: "~> 1.7",
       description: "Keep your ports contained",
       source_url: @source_url,
       elixirc_paths: elixirc_paths(Mix.env()),

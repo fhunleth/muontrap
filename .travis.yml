@@ -8,7 +8,7 @@ matrix:
     include:
     - os: linux
       compiler: gcc
-      env: ELIXIR_VERSION=1.9.1-otp-22 ERLANG_VERSION=22.0 DOCS=true DIALYZER=true
+      env: ELIXIR_VERSION=1.9.1-otp-22 ERLANG_VERSION=22.0 DOCS=true DIALYZER=true COVERALLS=true
     - os: linux
       compiler: gcc
       env: ELIXIR_VERSION=1.8.2-otp-22 ERLANG_VERSION=22.0 DOCS=true
@@ -43,9 +43,11 @@ before_script:
 
 script:
   - mix local.hex --force
+  - mix local.rebar --force
   - mix deps.get
   - mix compile
   - mix test
+  - if [ "$COVERALLS" = "true" ]; then MIX_ENV=test mix coveralls.circle; fi
   - if [ "$DOCS" = "true"; then MIX_ENV=docs mix docs; fi
   - mix format --check-formatted
   - MIX_ENV=docs mix hex.build

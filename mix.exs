@@ -12,6 +12,7 @@ defmodule MuonTrap.MixProject do
       description: "Keep your ports contained",
       source_url: @source_url,
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_coverage: [tool: ExCoveralls],
       docs: docs(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -37,6 +38,7 @@ defmodule MuonTrap.MixProject do
     [
       {:elixir_make, "~> 0.6", runtime: false},
       {:ex_doc, "~> 0.19", only: :docs, runtime: false},
+      {:excoveralls, "~> 0.8", only: :test, runtime: false},
       {:dialyxir, "~> 1.0.0-rc.4", only: [:dev, :test], runtime: false}
     ]
   end

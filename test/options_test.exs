@@ -1,77 +1,95 @@
-defmodule OptionsTest do
-  use ExUnit.Case
+defmodule MuonTrap.OptionsTest do
+  use MuonTrapTest.Case
+
   alias MuonTrap.Options
 
-  test "parses cgroup controllers" do
-    {args, leftover_opts} = Options.to_args(cgroup_controllers: ["cpu", "memory"])
-    assert args == ["--controller", "memory", "--controller", "cpu"]
-    assert leftover_opts == []
+  test "creates random cgroup path when asked" do
+    options = Options.validate(:cmd, "echo", [], cgroup_base: "base")
+    assert Map.has_key?(options, :cgroup_path)
+
+    ["base", other] = String.split(options.cgroup_path, "/")
+    assert byte_size(other) > 4
   end
 
-  test "parses cgroup path" do
-    {args, leftover_opts} = Options.to_args(cgroup_path: "test/path")
-    assert args == ["--group", "test/path"]
-    assert leftover_opts == []
+  test "disallow both cgroup_path and cgroup_base" do
+    assert_raise ArgumentError, fn ->
+      Options.validate(:cmd, "echo", [], cgroup_base: "base", cgroup_path: "path")
+    end
   end
 
-  test "parses cgroup sets" do
-    {args, leftover_opts} = Options.to_args(cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}])
-    assert args == ["--controller", "cpu", "--set", "cpu.cfs_period_us=100000"]
-    assert leftover_opts == []
+  test "errors match System.cmd ones" do
+    for context <- [:cmd, :daemon] do
+      # :enoent on missing executable
+      assert catch_error(Options.validate(context, "__this_should_not_exist", [], [])) == :enoent
+
+      assert_raise ArgumentError, fn ->
+        Options.validate(context, "echo", ['not_a_binary'], [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Options.validate(context, "why\0would_someone_do_this", [], [])
+      end
+    end
   end
 
-  test "parses cgroup sets 2" do
-    {args, leftover_opts} =
-      Options.to_args(
-        cgroup_sets: [
-          {"cpu", "cpu.cfs_period_us", "100000"},
-          {"cpu", "cpu.cfs_quota_us", "50000"}
-        ]
-      )
+  test "cmd and daemon-specific options" do
+    # :cmd-only
+    assert Map.get(Options.validate(:cmd, "echo", [], into: ""), :into) == ""
 
-    assert args == [
-             "--controller",
-             "cpu",
-             "--set",
-             "cpu.cfs_quota_us=50000",
-             "--controller",
-             "cpu",
-             "--set",
-             "cpu.cfs_period_us=100000"
-           ]
+    assert_raise ArgumentError, fn ->
+      Options.validate(:daemon, "echo", [], into: "")
+    end
 
-    assert leftover_opts == []
+    # :daemon-only
+    assert Map.get(Options.validate(:daemon, "echo", [], name: Something), :name) == Something
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:cmd, "echo", [], name: Something)
+    end
+
+    for level <- [:error, :warn, :info, :debug] do
+      assert Map.get(Options.validate(:daemon, "echo", [], log_output: level), :log_output) ==
+               level
+
+      assert_raise ArgumentError, fn ->
+        Options.validate(:cmd, "echo", [], log_output: level)
+      end
+    end
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:daemon, "echo", [], log_output: :bad_level)
+    end
   end
 
-  test "parses uid" do
-    {args, leftover_opts} = Options.to_args(uid: 1234)
-    assert args == ["--uid", "1234"]
-    assert leftover_opts == []
+  test "common commands basically work" do
+    input = [
+      cd: "path",
+      arg0: "arg0",
+      stderr_to_stdout: true,
+      parallelism: true,
+      uid: 5,
+      gid: "bill",
+      delay_to_sigkill: 1000,
+      env: [{"KEY", "VALUE"}, {"KEY2", "VALUE2"}],
+      cgroup_controllers: ["memory", "cpu"],
+      cgroup_base: "base",
+      cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}]
+    ]
 
-    {args, leftover_opts} = Options.to_args(uid: "bob")
-    assert args == ["--uid", "bob"]
-    assert leftover_opts == []
-  end
+    for context <- [:daemon, :cmd] do
+      options = Options.validate(context, "echo", [], input)
 
-  test "parses gid" do
-    {args, leftover_opts} = Options.to_args(gid: 14)
-    assert args == ["--gid", "14"]
-    assert leftover_opts == []
-
-    {args, leftover_opts} = Options.to_args(gid: "bob")
-    assert args == ["--gid", "bob"]
-    assert leftover_opts == []
-  end
-
-  test "parses delay-to-sigkill" do
-    {args, leftover_opts} = Options.to_args(delay_to_sigkill: 123)
-    assert args == ["--delay-to-sigkill", "123"]
-    assert leftover_opts == []
-  end
-
-  test "ignores unknown options" do
-    {args, leftover_opts} = Options.to_args(foo: :bar)
-    assert args == []
-    assert leftover_opts == [foo: :bar]
+      assert Map.get(options, :cd) == "path"
+      assert Map.get(options, :arg0) == "arg0"
+      assert Map.get(options, :stderr_to_stdout) == true
+      assert Map.get(options, :parallelism) == true
+      assert Map.get(options, :uid) == 5
+      assert Map.get(options, :gid) == "bill"
+      assert Map.get(options, :delay_to_sigkill) == 1000
+      assert Map.get(options, :env) == [{'KEY', 'VALUE'}, {'KEY2', 'VALUE2'}]
+      assert Map.get(options, :cgroup_controllers) == ["memory", "cpu"]
+      assert Map.get(options, :cgroup_base) == "base"
+      assert Map.get(options, :cgroup_sets) == [{"memory", "memory.limit_in_bytes", "268435456"}]
+    end
   end
 end

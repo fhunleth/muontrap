@@ -2,7 +2,6 @@ defmodule MuonTrap.Daemon do
   use GenServer
 
   require Logger
-  alias MuonTrap.Options
 
   @moduledoc """
   Wrap an OS process in a GenServer so that it can be supervised.
@@ -91,24 +90,32 @@ defmodule MuonTrap.Daemon do
 
   @impl true
   def init([command, args, opts]) do
-    cgroup_path = Keyword.get(opts, :cgroup_path)
+    options = MuonTrap.Options.validate(:daemon, command, args, opts)
 
-    {logging, opts} = Keyword.pop(opts, :log_output)
-    {stderr_to_stdout, opts} = Keyword.pop(opts, :stderr_to_stdout, false)
+    # cgroup_path = Keyword.get(opts, :cgroup_path)
 
-    {muontrap_args, leftover_opts} = Options.to_args(opts)
-    updated_args = muontrap_args ++ ["--", command] ++ args
+    # {logging, opts} = Keyword.pop(opts, :log_output)
+    # {stderr_to_stdout, opts} = Keyword.pop(opts, :stderr_to_stdout, false)
 
-    updated_opts =
-      leftover_opts
-      |> validate_port_opts()
-      |> add_stderr_to_stdout(stderr_to_stdout)
+    # {muontrap_args, leftover_opts} = Options.to_args(opts)
+    # updated_args = muontrap_args ++ ["--", command] ++ args
 
-    port_options = [:exit_status, {:args, updated_args}, {:line, 256} | updated_opts]
+    # updated_opts =
+    #   leftover_opts
+    #   |> validate_port_opts()
+    #   |> add_stderr_to_stdout(stderr_to_stdout)
+
+    port_options = MuonTrap.Port.port_options(options) ++ [{:line, 256}]
 
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
-    {:ok, %State{command: command, port: port, cgroup_path: cgroup_path, log_output: logging}}
+    {:ok,
+     %State{
+       command: command,
+       port: port,
+       cgroup_path: Map.get(options, :cgroup_path),
+       log_output: Map.get(options, :log_output)
+     }}
   end
 
   @impl true
@@ -162,38 +169,5 @@ defmodule MuonTrap.Daemon do
       end
 
     {:stop, reason, state}
-  end
-
-  defp add_stderr_to_stdout(opts, true), do: [:stderr_to_stdout | opts]
-  defp add_stderr_to_stdout(opts, false), do: opts
-
-  # See System.cmd/3 implementation
-  defp validate_port_opts([]), do: []
-
-  defp validate_port_opts(opts) do
-    validate_port_opts(opts, [])
-  end
-
-  defp validate_port_opts([], opts), do: opts
-
-  defp validate_port_opts([{:env, env} | rest], opts) do
-    validate_port_opts(rest, [{:env, validate_env(env)} | opts])
-  end
-
-  defp validate_port_opts([opt | rest], opts) do
-    validate_port_opts(rest, [opt | opts])
-  end
-
-  defp validate_env(enum) do
-    Enum.map(enum, fn
-      {k, nil} ->
-        {String.to_charlist(k), false}
-
-      {k, v} ->
-        {String.to_charlist(k), String.to_charlist(v)}
-
-      other ->
-        raise ArgumentError, "invalid environment key-value #{inspect(other)}"
-    end)
   end
 end

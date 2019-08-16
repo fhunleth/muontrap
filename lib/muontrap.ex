@@ -44,21 +44,31 @@ defmodule MuonTrap do
   system for an example.
   """
 
-  alias MuonTrap.Options
-
   @doc ~S"""
   Executes a command like `System.cmd/3` via the `muontrap` wrapper.
 
   # Options
 
     * `:cgroup_controllers` - run the command under the specified cgroup controllers. Defaults to `[]`.
-    * `:cgroup_path` - use the specified path for the cgroup
+    * `:cgroup_base` - create a temporary path under the specified cgroup path
+    * `:cgroup_path` - explicitly specify a path to use. Use `:cgroup_base`, unless you must control the path.
     * `:cgroup_sets` - set a cgroup controller parameter before running the command
     * `:delay_to_sigkill` - milliseconds before sending a SIGKILL to a child process if it doesn't exit with a SIGTERM
     * `:uid` - run the command using the specified uid or username
     * `:gid` - run the command using the specified gid or group
 
-  See `System.cmd/3` for additional options.
+  The following `System.cmd/3` options are also available:
+
+    * `:into` - injects the result into the given collectable, defaults to `""`
+    * `:cd` - the directory to run the command in
+    * `:env` - an enumerable of tuples containing environment key-value as binary
+    * `:arg0` - sets the command arg0
+    * `:stderr_to_stdout` - redirects stderr to stdout when `true`
+    * `:parallelism` - when `true`, the VM will schedule port tasks to improve
+      parallelism in the system. If set to `false`, the VM will try to perform
+      commands immediately, improving latency at the expense of parallelism.
+      The default can be set on system startup by passing the "+spp" argument
+      to `--erl`.
 
   # Examples
 
@@ -86,17 +96,9 @@ defmodule MuonTrap do
   @spec cmd(binary(), [binary()], keyword()) ::
           {Collectable.t(), exit_status :: non_neg_integer()}
   def cmd(command, args, opts \\ []) when is_binary(command) and is_list(args) do
-    assert_no_null_byte!(command, "MuonTrap.cmd/3")
+    options = MuonTrap.Options.validate(:cmd, command, args, opts)
 
-    unless Enum.all?(args, &is_binary/1) do
-      raise ArgumentError, "all arguments for MuonTrap.cmd/3 must be binaries"
-    end
-
-    command = System.find_executable(command) || :erlang.error(:enoent, [command, args, opts])
-
-    {muontrap_args, updated_opts} = Options.to_args(opts)
-    updated_args = muontrap_args ++ ["--", command] ++ args
-    System.cmd(muontrap_path(), updated_args, updated_opts)
+    MuonTrap.Port.cmd(options)
   end
 
   @doc """
@@ -104,20 +106,5 @@ defmodule MuonTrap do
 
   Call this if you want to invoke the `muontrap` port binary manually.
   """
-  @spec muontrap_path() :: binary()
-  def muontrap_path() do
-    Application.app_dir(:muontrap, "priv/muontrap")
-  end
-
-  # Copied from Elixir's system.ex to make MuonTrap.cmd pass System.cmd's tests
-  defp assert_no_null_byte!(binary, operation) do
-    case :binary.match(binary, "\0") do
-      {_, _} ->
-        raise ArgumentError,
-              "cannot execute #{operation} for program with null byte, got: #{inspect(binary)}"
-
-      :nomatch ->
-        :ok
-    end
-  end
+  defdelegate muontrap_path, to: MuonTrap.Port
 end

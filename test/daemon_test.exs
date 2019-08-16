@@ -4,10 +4,14 @@ defmodule DaemonTest do
 
   alias MuonTrap.Daemon
 
+  defp test_path(cmd) do
+    Path.join([File.cwd!(), "test", cmd])
+  end
+
   test "stopping the daemon kills the process" do
     {:ok, pid} =
       start_supervised(
-        {Daemon, ["test/do_nothing.test", [], [id: :do_nothing, stderr_to_stdout: true]]}
+        {Daemon, [test_path("do_nothing.test"), [], [id: :do_nothing, stderr_to_stdout: true]]}
       )
 
     os_pid = Daemon.os_pid(pid)
@@ -47,7 +51,7 @@ defmodule DaemonTest do
     opts = [log_output: :error, stderr_to_stdout: true]
 
     fun = fn ->
-      {:ok, _pid} = start_supervised({Daemon, ["test/echo_stderr.test", [], opts]})
+      {:ok, _pid} = start_supervised({Daemon, [test_path("echo_stderr.test"), [], opts]})
       wait_for_close_check()
       Logger.flush()
     end
@@ -90,7 +94,7 @@ defmodule DaemonTest do
       capture_log(fn ->
         {:ok, _pid} =
           start_supervised(
-            {Daemon, ["test/succeed_second_time.test", [tempfile], [log_output: :error]]},
+            {Daemon, [test_path("succeed_second_time.test"), [tempfile], [log_output: :error]]},
             restart: :transient
           )
 
@@ -115,7 +119,7 @@ defmodule DaemonTest do
       capture_log(fn ->
         {:ok, _pid} =
           start_supervised(
-            {Daemon, ["test/succeed_second_time.test", [tempfile], [log_output: :error]]},
+            {Daemon, [test_path("succeed_second_time.test"), [tempfile], [log_output: :error]]},
             restart: :permanent
           )
 

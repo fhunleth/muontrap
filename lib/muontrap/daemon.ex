@@ -17,12 +17,12 @@ defmodule MuonTrap.Daemon do
   Supervisor.start_link(children, opts)
   ```
 
-  In the `child_spec` tuple, the second element is a list that corresponds to the
-  `MuonTrap.cmd/3` parameters. I.e., The first item in the list is the program to
-  run, the second is a list of commandline arguments, and the third is a list of
-  options. The same options as `MuonTrap.cmd/3` are available with the following additions:
+  In the `child_spec` tuple, the second element is a list that corresponds to
+  the `MuonTrap.cmd/3` parameters. I.e., The first item in the list is the
+  program to run, the second is a list of commandline arguments, and the third
+  is a list of options. The same options as `MuonTrap.cmd/3` are available with
+  the following additions:
 
-  * `:id` - Use the specified `id` in the supervision tree (defaults to `MuonTrap.Daemon`)
   * `:name` - Name the Daemon GenServer
   * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
@@ -39,10 +39,8 @@ defmodule MuonTrap.Daemon do
   end
 
   def child_spec([command, args, opts]) do
-    {id, opts} = Keyword.pop(opts, :id, __MODULE__)
-
     %{
-      id: id,
+      id: __MODULE__,
       start: {__MODULE__, :start_link, [command, args, opts]},
       type: :worker,
       restart: :permanent,
@@ -91,20 +89,6 @@ defmodule MuonTrap.Daemon do
   @impl true
   def init([command, args, opts]) do
     options = MuonTrap.Options.validate(:daemon, command, args, opts)
-
-    # cgroup_path = Keyword.get(opts, :cgroup_path)
-
-    # {logging, opts} = Keyword.pop(opts, :log_output)
-    # {stderr_to_stdout, opts} = Keyword.pop(opts, :stderr_to_stdout, false)
-
-    # {muontrap_args, leftover_opts} = Options.to_args(opts)
-    # updated_args = muontrap_args ++ ["--", command] ++ args
-
-    # updated_opts =
-    #   leftover_opts
-    #   |> validate_port_opts()
-    #   |> add_stderr_to_stdout(stderr_to_stdout)
-
     port_options = MuonTrap.Port.port_options(options) ++ [{:line, 256}]
 
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)

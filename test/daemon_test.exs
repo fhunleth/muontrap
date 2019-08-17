@@ -11,7 +11,7 @@ defmodule DaemonTest do
   test "stopping the daemon kills the process" do
     {:ok, pid} =
       start_supervised(
-        {Daemon, [test_path("do_nothing.test"), [], [id: :do_nothing, stderr_to_stdout: true]]}
+        Supervisor.child_spec({Daemon, [test_path("do_nothing.test"), []]}, id: :do_nothing)
       )
 
     os_pid = Daemon.os_pid(pid)

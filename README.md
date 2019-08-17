@@ -11,10 +11,62 @@ cgroups to prevent many other shenanigans.
 
 Some other features:
 
+* Attach your OS process to a supervision tree via a convenient `child_spec`
 * Set `cgroup` controls like thresholds on memory and CPU utilization
 * Start OS processes as a different user or group
 * Send SIGKILL to processes that aren't responsive to SIGTERM
 * With `cgroups`, ensure that all children of launched processes have been killed too
+
+## TL;DR
+
+Add `muontrap` to your project's `mix.exs` dependency list:
+
+```elixir
+def deps do
+  [
+    {:muontrap, "~> 0.4"}
+  ]
+end
+```
+
+Run a command similar to
+[`System.cmd/3`](https://hexdocs.pm/elixir/System.html#cmd/3):
+
+```elixir
+iex>  MuonTrap.cmd("echo", ["hello"])
+{"hello\n", 0}
+```
+
+Attach a long running process to a supervision tree using a
+[child_spec](https://hexdocs.pm/elixir/Supervisor.html#module-child-specification)
+like the following:
+
+```elixir
+{MuonTrap.Daemon, ["long_running_command", ["arg1", "arg2"], options]}
+```
+
+Running on Linux and can use cgroups? Then create a new cgroup:
+
+```bash
+sudo cgcreate -a $(whoami) -g memory:mycgroup
+```
+
+```elixir
+{MuonTrap.Daemon,
+ [
+   "long_running_command",
+   ["arg1", "arg2"],
+   [cgroup_controllers: ["memory"], cgroup_base: "mycgroup"]
+ ]}
+```
+
+`MuonTrap` will create a cgroup under "mycgroup" to run the
+`"long_running_command"`. If the command fails, it will be restarted. If it
+should no longer be running (like if something else crashed in Elixir and
+supervision needs to clean up) then MuonTrap will kill `"long_running_command"`
+and all of its children.
+
+Want to know more? Read on...
 
 ## The problem
 
@@ -76,19 +128,6 @@ programs that communicate via the port or send signals. That feature is possible
 to add, but you'll probably be happier with other solutions like
 [erlexec](https://github.com/saleyn/erlexec/).
 
-## Installation
-
-The package can be installed by adding `muontrap` to your list of dependencies
-in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:muontrap, "~> 0.4"}
-  ]
-end
-```
-
 ## Running commands
 
 The simplest way to use `muontrap` is as a replacement to `System.cmd/3`. Here's
@@ -136,17 +175,24 @@ cgroup options now. In this case, we'll use the `cpu` controller, but this
 example would work fine with any of the controllers.
 
 ```elixir
-iex>  MuonTrap.cmd("spawning_program", [], cgroup_controllers: ["cpu"], cgroup_path: "mycgroup/test")
+iex>  MuonTrap.cmd("spawning_program", [], cgroup_controllers: ["cpu"], cgroup_base: "mycgroup")
 {"hello\n", 0}
 ```
 
-In this example, `muontrap` runs `spawning_program` in the `cpu/mycgroup/test`
-group. The cgroup parameters may be modified outside of
+In this example, `muontrap` runs `spawning_program` in a sub-cgroup under the
+`cpu/mycgroup` group. The cgroup parameters may be modified outside of
 `muontrap` using `cgset` or my accessing the cgroup mountpoint manually.
 
 On any error or if the Erlang VM closes the port or if `spawning_program` exits,
-`muontrap` will kill all OS processes in `mycgroup/test`. No need to worry about
+`muontrap` will kill all OS processes in cgroup. No need to worry about
 random processes accumulating on your system.
+
+Note that if you use `cgroup_base`, a temporary cgroup is created for running
+the command. If you want `muontrap` to use a particular cgroup and not create a
+subgroup for the command, use the `:cgroup_path` option. Note that if you
+explicitly specify a cgroup, be careful not to use it for anything else.
+`MuonTrap` assumes that it owns the cgroup and when it needs to kill processes,
+it kills all of them in the cgroup.
 
 ### Limit the memory used by a process
 
@@ -155,7 +201,7 @@ surface. If you'd like to limit an OS process and all of its child processes to
 a maximum amount of memory, you can do that with the `memory` controller:
 
 ```elixir
-iex>  MuonTrap.cmd("memory_hog", [], cgroup_controllers: ["memory"], cgroup_path: "mycgroup/test2", cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}])
+iex>  MuonTrap.cmd("memory_hog", [], cgroup_controllers: ["memory"], cgroup_base: "mycgroup", cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}])
 ```
 
 That line restricts the total memory used by `memory_hog` to 256 MB.
@@ -169,7 +215,7 @@ of those microseconds can be used. Here's an example call that prevents a
 program from using more than 50% of the CPU:
 
 ```elixir
-iex>  MuonTrap.cmd("cpu_hog", [], cgroup_controllers: ["cpu"], cgroup_path: "mycgroup/test3", cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}, {"cpu", "cpu.cfs_quota_us", 50000}])
+iex>  MuonTrap.cmd("cpu_hog", [], cgroup_controllers: ["cpu"], cgroup_base: "mycgroup", cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}, {"cpu", "cpu.cfs_quota_us", 50000}])
 ```
 
 ## Supervision

@@ -10,7 +10,7 @@ defmodule MuonTrap.Daemon do
 
   ```elixir
   children = [
-    {MuonTrap.Daemon, ["my_server", ["--options", "foo")], [id: :my_daemon, cd: "/some_directory"]]}
+    {MuonTrap.Daemon, ["my_server", ["--options", "foo")], [cd: "/some_directory"]]}
   ]
 
   opts = [strategy: :one_for_one, name: MyApplication.Supervisor]
@@ -26,6 +26,13 @@ defmodule MuonTrap.Daemon do
   * `:name` - Name the Daemon GenServer
   * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
+
+  If you want to run multiple `MuonTrap.Daemon`s under one supervisor, they'll
+  all need unique IDs. Use `Supervisor.child_spec/2` like this:
+
+  ```elixir
+  Supervisor.child_spec({MuonTrap.Daemon, ["my_server"), []]}, id: :server1)
+  ```
   """
 
   defmodule State do

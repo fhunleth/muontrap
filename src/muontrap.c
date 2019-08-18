@@ -267,6 +267,7 @@ static int kill_children(int sig)
     return children_killed;
 }
 
+#ifdef DEBUG
 static void read_proc_cmdline(int pid, char *cmdline)
 {
     char *cmdline_filename;
@@ -312,6 +313,7 @@ static void dump_all_children_from_cgroups()
         procfile_dump_children(controller->procfile);
     }
 }
+#endif
 
 static void finish_controller_init()
 {

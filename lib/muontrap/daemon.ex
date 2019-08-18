@@ -65,7 +65,8 @@ defmodule MuonTrap.Daemon do
   @doc """
   Get the value of the specified cgroup variable.
   """
-  @spec cgget(GenServer.server(), binary(), binary()) :: binary()
+  @spec cgget(GenServer.server(), binary(), binary()) ::
+          {:ok, String.t()} | {:error, File.posix()}
   def cgget(server, controller, variable_name) do
     GenServer.call(server, {:cgget, controller, variable_name})
   end
@@ -73,7 +74,7 @@ defmodule MuonTrap.Daemon do
   @doc """
   Modify a cgroup variable.
   """
-  @spec cgset(GenServer.server(), binary(), binary(), binary()) :: :ok | no_return()
+  @spec cgset(GenServer.server(), binary(), binary(), binary()) :: :ok | {:error, File.posix()}
   def cgset(server, controller, variable_name, value) do
     GenServer.call(server, {:cgset, controller, variable_name, value})
   end
@@ -102,18 +103,22 @@ defmodule MuonTrap.Daemon do
      }}
   end
 
+  alias MuonTrap.Cgroups
+
   @impl true
-  def handle_call({:cgget, controller, variable_name}, _from, state) do
-    result =
-      System.cmd("cat", ["/sys/fs/cgroups/#{controller}/#{state.cgroup_path}/#{variable_name}"])
+  def handle_call({:cgget, controller, variable_name}, _from, %{cgroup_path: cgroup_path} = state) do
+    result = Cgroups.cgget(controller, cgroup_path, variable_name)
 
     {:reply, result, state}
   end
 
   @impl true
-  def handle_call({:cgset, controller, variable_name, value}, _from, state) do
-    result =
-      File.write!("/sys/fs/cgroups/#{controller}/#{state.cgroup_path}/#{variable_name}", value)
+  def handle_call(
+        {:cgset, controller, variable_name, value},
+        _from,
+        %{cgroup_path: cgroup_path} = state
+      ) do
+    result = Cgroups.cgset(controller, cgroup_path, variable_name, value)
 
     {:reply, result, state}
   end

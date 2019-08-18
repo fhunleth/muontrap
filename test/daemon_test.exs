@@ -135,4 +135,24 @@ defmodule DaemonTest do
     assert log =~ "Called 1 times"
     assert log =~ "Called 2 times"
   end
+
+  @tag :cgroup
+  test "can start daemon with cgroups" do
+    {:ok, pid} =
+      start_supervised(
+        {Daemon,
+         [
+           test_path("do_nothing.test"),
+           [],
+           [cgroup_base: "muontrap_test", cgroup_controllers: ["memory"]]
+         ]}
+      )
+
+    os_pid = Daemon.os_pid(pid)
+    assert_os_pid_running(os_pid)
+
+    {:ok, memory_str} = Daemon.cgget(pid, "memory", "memory.limit_in_bytes")
+    memory = Integer.parse(memory_str)
+    assert memory > 1000
+  end
 end

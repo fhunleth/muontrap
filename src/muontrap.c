@@ -371,7 +371,7 @@ static void kill_child_nicely(pid_t child)
     if (brutal_kill_wait_us > 0) {
         int start = microsecs();
         int timeleft = brutal_kill_wait_us;
-        INFO("Wait %d us. Time is %d", timeleft, microsecs());
+        INFO("Waiting %d us", timeleft);
         for (;;) {
             rc = usleep(timeleft);
             if (rc == 0) {
@@ -396,7 +396,7 @@ static void kill_child_nicely(pid_t child)
             }
         }
 
-        INFO("Wait complete. Time is %d", microsecs());
+        INFO("Wait complete.");
     }
 
     // Brutal kill

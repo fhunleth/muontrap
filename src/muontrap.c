@@ -1,5 +1,6 @@
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <grp.h>
 #include <poll.h>
@@ -540,6 +541,9 @@ int main(int argc, char *argv[])
 
     if (pipe(signal_pipe) < 0)
         err(EXIT_FAILURE, "pipe");
+    if (fcntl(signal_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
+        fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
+        warn("fcntl(FD_CLOEXEC)");
 
     enable_signals();
     atexit(cleanup);

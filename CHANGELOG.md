@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.5.0-rc.0
+
+This update contains many changes throughout. If you're using cgroups, please
+review the changes as they likely affect your code.
+
+* New features
+  * Added `:cgroup_base`. The preferred way of using cgroups now is for MuonTrap
+    to create a sub-cgroup for running the command. This removes the need to
+    keep track of cgroup paths on your own when you run more than one command at
+    a time. `:cgroup_path` is still available.
+  * Almost all inconsistencies between MuonTrap.Daemon and MuonTrap.cmd/3 have
+    been fixed. As a result, MuonTrap.Daemon detects and raises more exceptions
+    than previous. It is possible that code that worked before will now break.
+  * MuonTrap.Daemon sets its exit status based on the process's exit code.
+    Successful exit codes (exit code 0) exit `:normal` and failed exit codes
+    (anything else) do not. This makes it possible to use the Supervisor
+    `:temporary` restart strategy that only restarts failures.
+  * MuonTrap.Daemon supports a `:name` parameter for setting GenServer names.
+  * MuonTrap.Daemon `cgget` and `cgset` helpers return ok/error tuples now since
+    it was too easy to accidentally call them such that they'd raise.
+
+* Bug fixes
+  * Forcefully killed processes would get stuck in a zombie state until the kill
+    timeout expired due to a missing call to wait(2). This has been fixed.
+
 ## v0.4.4
 
 * Bug fixes
@@ -37,7 +62,7 @@
 ## v0.3.1
 
 * Bug fixes
-  * Make MuonTrap.Daemon usable (childspecs, options)
+  * Make MuonTrap.Daemon usable (child_specs, options)
 
 ## v0.3.0
 

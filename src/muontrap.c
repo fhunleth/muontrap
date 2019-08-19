@@ -56,7 +56,7 @@ struct controller_info {
 
 static struct controller_info *controllers = NULL;
 static const char *cgroup_path = NULL;
-static int brutal_kill_wait_us = 1000;
+static int brutal_kill_wait_ms = 10;
 static uid_t run_as_uid = 0; // 0 means don't set, since we don't support privilege escalation
 static gid_t run_as_gid = 0; // 0 means don't set, since we don't support privilege escalation
 
@@ -96,7 +96,7 @@ void sigchild_handler(int signum)
         warn("write(signal_pipe)");
 }
 
-void enable_signals()
+void enable_signal_handlers()
 {
     struct sigaction sa;
     sa.sa_handler = sigchild_handler;
@@ -109,7 +109,7 @@ void enable_signals()
     sigaction(SIGTERM, &sa, NULL);
 }
 
-void disable_signals()
+void disable_signal_handlers()
 {
     sigaction(SIGCHLD, NULL, NULL);
     sigaction(SIGINT, NULL, NULL);
@@ -324,40 +324,95 @@ static void finish_controller_init()
     }
 }
 
-static void cleanup()
+static int wait_for_sigchld(pid_t pid_to_match, int timeout_ms)
 {
-    INFO("cleaning up!");
+    struct pollfd fds[1];
+    fds[0].fd = signal_pipe[0];
+    fds[0].events = POLLIN;
 
-    disable_signals();
+    int end_timeout_us = microsecs() + (1000 * timeout_ms);
+    int next_time_to_wait_ms = timeout_ms;
+    do {
+        INFO("poll - %d ms", next_time_to_wait_ms);
+        if (poll(fds, 1, next_time_to_wait_ms) < 0) {
+            if (errno == EINTR)
+                continue;
 
+            warn("poll");
+            return -1;
+        }
+
+        if (fds[0].revents) {
+            int signal;
+            ssize_t amt = read(signal_pipe[0], &signal, sizeof(signal));
+            if (amt < 0) {
+                warn("read signal_pipe");
+                return -1;
+            }
+
+            INFO("signal_pipe - SIGNAL %d", signal);
+            switch (signal) {
+            case SIGCHLD: {
+                int status;
+                pid_t pid = wait(&status);
+                if (pid_to_match == pid) {
+                    INFO("cleaned up matching pid %d.", pid);
+                    return 0;
+                }
+                INFO("cleaned up pid %d.", pid);
+                break;
+            }
+
+            case SIGTERM:
+            case SIGQUIT:
+            case SIGINT:
+                return -1;
+
+            default:
+                warn("unexpected signal: %d", signal);
+                return -1;
+            }
+        }
+
+        next_time_to_wait_ms = (end_timeout_us - microsecs()) / 1000;
+    } while (next_time_to_wait_ms > 0);
+
+    INFO("timed out waiting for pid %d", pid_to_match);
+    return -1;
+}
+
+static void cleanup_all_children()
+{
     // In order to cleanup the cgroup, all processes need to exit.
-    // The immediate child will have either exited or gotten a SIGTERM
-    // at this point. Its children can still be around, though.
+    // The immediate child of muontrap will have either exited
+    // at this point, so any other processes are orphaned descendents.
+    // I.e., Their parent is now PID 1 and we won't get a SIGCHLD when
+    // they die. We only know who they are since they're in the cgruop.
 
-    // Send a SIGTERM to all children
-    if (kill_children(SIGTERM) > 0) {
-       // If a child was found, give it a short chance to exit.
-       usleep(1000);
+    // Send every child a SIGKILL
+    int children_left = kill_children(SIGKILL);
+    if (children_left > 0) {
+        INFO("Found %d pids and sent them a SIGKILL", children_left);
+        // poll to see if the cleanup is done every 1 ms
+        int poll_intervals = brutal_kill_wait_ms / 1;
+        do {
+            usleep(1000);
 
-       // Now hammer the children with SIGKILLs to get them to go away.
-       int retries = 10;
-       while (retries > 0 && kill_children(SIGKILL) > 0) {
-           usleep(1000);
-           retries--;
-       }
+            // Check for children and send SIGKILLs again. This
+            // handles the race where we a new process was spawned
+            // when we iterated through the pids the previous time.
+            children_left = kill_children(SIGKILL);
+            INFO("%d pids are still around", children_left);
+            poll_intervals--;
+        } while (poll_intervals && children_left);
 
-       if (retries == 0) {
-           warnx("Failed to kill all children even after retrying!");
+        if (children_left > 0) {
+            warnx("Failed to kill %d pids!", children_left);
 #ifdef DEBUG
-           dump_all_children_from_cgroups();
+            dump_all_children_from_cgroups();
 #endif
-       }
+        }
     }
-
-    // Clean up our cgroup
-    destroy_cgroups();
-
-    INFO("cleanup done");
 }
 
 static void kill_child_nicely(pid_t child)
@@ -368,41 +423,17 @@ static void kill_child_nicely(pid_t child)
     if (rc < 0)
         return;
 
-    // Wait a little.
-    if (brutal_kill_wait_us > 0) {
-        int start = microsecs();
-        int timeleft = brutal_kill_wait_us;
-        INFO("Waiting %d us", timeleft);
-        for (;;) {
-            rc = usleep(timeleft);
-            if (rc == 0) {
-                break;
-            } else {
-                int reason = errno;
+    // Wait a little for the child to exit
+    if (wait_for_sigchld(child, brutal_kill_wait_ms) < 0) {
+        // Child didn't exit, so SIGKILL it.
+        rc = kill(child, SIGKILL);
+        INFO("kill -%d %d -> %d (%s)", SIGKILL, child, rc, rc < 0 ? strerror(errno) : "success");
+        if (rc < 0)
+            return;
 
-                // Error from usleep. Check if moot since child exited.
-                if (kill(child, 0) < 0) {
-                    INFO("Child %d not running any more.", child);
-                    return;
-                }
-                if (reason == EINTR) {
-                    // Try again with a possibly shorter timeout.
-                    timeleft = brutal_kill_wait_us - (microsecs() - start);
-                    if (timeleft <= 0)
-                        break;
-                } else {
-                    warn("usleep");
-                    break;
-                }
-            }
-        }
-
-        INFO("Wait complete.");
+        if (wait_for_sigchld(child, brutal_kill_wait_ms) < 0)
+            warn("SIGKILL didn't work on %d", child);
     }
-
-    // Brutal kill
-    rc = kill(child, SIGKILL);
-    INFO("kill -%d %d -> %d (%s)", SIGKILL, child, rc, strerror(errno));
 }
 
 static struct controller_info *add_controller(const char *name)
@@ -430,6 +461,63 @@ static void add_controller_setting(struct controller_info *controller, const cha
     new_var->value = value;
     new_var->next = controller->vars;
     controller->vars = new_var;
+}
+
+static int child_wait_loop(pid_t child_pid, int *still_running)
+{
+    struct pollfd fds[2];
+    fds[0].fd = STDIN_FILENO;
+    fds[0].events = POLLHUP; // POLLERR is implicit
+    fds[1].fd = signal_pipe[0];
+    fds[1].events = POLLIN;
+
+    for (;;) {
+        if (poll(fds, 2, -1) < 0) {
+            if (errno == EINTR)
+                continue;
+
+            warn("poll");
+            return EXIT_FAILURE;
+        }
+
+        if (fds[0].revents) {
+            INFO("stdin closed. cleaning up...");
+            return EXIT_FAILURE;
+        }
+        if (fds[1].revents) {
+            int signal;
+            ssize_t amt = read(signal_pipe[0], &signal, sizeof(signal));
+            if (amt < 0) {
+                warn("read signal_pipe");
+                return EXIT_FAILURE;
+            }
+
+            switch (signal) {
+            case SIGCHLD: {
+                int status;
+                pid_t dying_pid = wait(&status);
+                if (dying_pid == child_pid) {
+                    int exit_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+                    INFO("main child exited. status=%d, our exit code: %d", status, exit_status);
+                    *still_running = 0;
+                    return exit_status;
+                } else {
+                    INFO("something else caused sigchild: pid=%d, status=%d. our child=%d", dying_pid, status, child_pid);
+                }
+                break;
+            }
+
+            case SIGTERM:
+            case SIGQUIT:
+            case SIGINT:
+                return EXIT_FAILURE;
+
+            default:
+                warn("unexpected signal: %d", signal);
+                return EXIT_FAILURE;
+            }
+        }
+    }
 }
 
 int main(int argc, char *argv[])
@@ -482,8 +570,9 @@ int main(int argc, char *argv[])
             exit(EXIT_SUCCESS);
 
         case 'k': // --delay-to-sigkill
-            brutal_kill_wait_us = strtoul(optarg, NULL, 0);
-            if (brutal_kill_wait_us > 1000000)
+            // Specified in microseconds for legacy reasons
+            brutal_kill_wait_ms = strtoul(optarg, NULL, 0) / 1000;
+            if (brutal_kill_wait_ms > 1000)
                 errx(EXIT_FAILURE, "Delay to sending a SIGKILL must be < 1,000,000 (1 second)");
             break;
 
@@ -539,14 +628,15 @@ int main(int argc, char *argv[])
 
     finish_controller_init();
 
+    // Finished processing commandline. Initialize and run child.
+
     if (pipe(signal_pipe) < 0)
         err(EXIT_FAILURE, "pipe");
     if (fcntl(signal_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
         fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
         warn("fcntl(FD_CLOEXEC)");
 
-    enable_signals();
-    atexit(cleanup);
+    enable_signal_handlers();
 
     create_cgroups();
 
@@ -556,56 +646,20 @@ int main(int argc, char *argv[])
     if (argv0)
         argv[optind] = argv0;
     pid_t pid = fork_exec(program_name, &argv[optind]);
-    struct pollfd fds[2];
-    fds[0].fd = STDIN_FILENO;
-    fds[0].events = POLLHUP; // POLLERR is implicit
-    fds[1].fd = signal_pipe[0];
-    fds[1].events = POLLIN;
 
-    for (;;) {
-        if (poll(fds, 2, -1) < 0) {
-            if (errno == EINTR)
-                continue;
+    int still_running = 1;
+    int exit_status = child_wait_loop(pid, &still_running);
 
-            err(EXIT_FAILURE, "poll");
-        }
-
-        if (fds[0].revents) {
-            INFO("stdin closed. cleaning up...");
-            disable_signals();
-            kill_child_nicely(pid);
-            break;
-        }
-        if (fds[1].revents) {
-            int signal;
-            ssize_t amt = read(signal_pipe[0], &signal, sizeof(signal));
-            if (amt < 0)
-                err(EXIT_FAILURE, "read signal_pipe");
-
-            switch (signal) {
-            case SIGCHLD: {
-                int status;
-                pid_t dying_pid = wait(&status);
-                if (dying_pid == pid) {
-                    int exit_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-                    INFO("main child exited. status=%d, our exit code: %d", status, exit_status);
-                    exit(exit_status);
-                } else {
-                    INFO("something else caused sigchild: pid=%d, status=%d. our child=%d", dying_pid, status, pid);
-                }
-                break;
-            }
-
-            case SIGTERM:
-            case SIGQUIT:
-            case SIGINT:
-                exit(EXIT_FAILURE);
-
-            default:
-                err(EXIT_FAILURE, "unexpected signal: %d", signal);
-            }
-        }
+    if (still_running) {
+        // Kill our immediate child if it's still running
+        kill_child_nicely(pid);
     }
 
-    exit(EXIT_SUCCESS);
+    // Cleanup all descendents if using cgroups
+    cleanup_all_children();
+
+    destroy_cgroups();
+    disable_signal_handlers();
+
+    exit(exit_status);
 }

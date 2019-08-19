@@ -56,7 +56,7 @@ struct controller_info {
 
 static struct controller_info *controllers = NULL;
 static const char *cgroup_path = NULL;
-static int brutal_kill_wait_ms = 10;
+static int brutal_kill_wait_ms = 500;
 static uid_t run_as_uid = 0; // 0 means don't set, since we don't support privilege escalation
 static gid_t run_as_gid = 0; // 0 means don't set, since we don't support privilege escalation
 

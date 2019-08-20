@@ -4,6 +4,7 @@
 
 int main(int argc, char **argv)
 {
-    sleep(1000000);
+    // Hang out long enough to satisfy the tests
+    sleep(120);
     exit(0);
 }

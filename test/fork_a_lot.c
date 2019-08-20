@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 // Fork a tree of children and print out the pids
@@ -15,7 +16,8 @@ static void do_fork(int left)
         if (pid == 0) {
             // Child
             do_fork(left - 1);
-            sleep(1000000);
+            // Hang out long enough to satisfy the tests
+            sleep(120);
         }
         printf("%d\n", pid);
         fflush(stdout);
@@ -30,6 +32,6 @@ int main(int argc, char **argv)
     do_fork(4);
 
     // parent
-    sleep(1000000);
+    sleep(120);
     exit(0);
 }

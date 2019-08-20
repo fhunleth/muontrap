@@ -10,6 +10,6 @@ int main(int argc, char **argv)
     sigaddset(&mask, SIGTERM);
     sigprocmask(SIG_BLOCK, &mask, NULL);
 
-    sleep(1000000);
+    sleep(120);
     exit(0);
 }

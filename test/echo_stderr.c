@@ -5,6 +5,7 @@
 int main()
 {
     fprintf(stderr, "stderr message\n");
-    sleep(1000000);
+    // Hang out long enough to satisfy the tests
+    sleep(120);
     exit(0);
 }

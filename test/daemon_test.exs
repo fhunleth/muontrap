@@ -8,16 +8,21 @@ defmodule DaemonTest do
     Path.join([File.cwd!(), "test", cmd])
   end
 
+  defp daemon_spec(cmd, args) do
+    Supervisor.child_spec({Daemon, [cmd, args]}, id: :test_daemon)
+  end
+
+  defp daemon_spec(cmd, args, opts) do
+    Supervisor.child_spec({Daemon, [cmd, args, opts]}, id: :test_daemon)
+  end
+
   test "stopping the daemon kills the process" do
-    {:ok, pid} =
-      start_supervised(
-        Supervisor.child_spec({Daemon, [test_path("do_nothing.test"), []]}, id: :do_nothing)
-      )
+    {:ok, pid} = start_supervised(daemon_spec(test_path("do_nothing.test"), []))
 
     os_pid = Daemon.os_pid(pid)
     assert_os_pid_running(os_pid)
 
-    :ok = stop_supervised(:do_nothing)
+    :ok = stop_supervised(:test_daemon)
 
     wait_for_close_check()
     assert_os_pid_exited(os_pid)
@@ -25,10 +30,7 @@ defmodule DaemonTest do
 
   test "daemon logs output when told" do
     fun = fn ->
-      {:ok, _pid} =
-        start_supervised(
-          {Daemon, ["echo", ["hello"], [stderr_to_stdout: true, log_output: :error]]}
-        )
+      {:ok, _pid} = start_supervised(daemon_spec("echo", ["hello"], log_output: :error))
 
       wait_for_close_check()
       Logger.flush()
@@ -39,7 +41,8 @@ defmodule DaemonTest do
 
   test "daemon doesn't log output by default" do
     fun = fn ->
-      {:ok, _pid} = start_supervised({Daemon, ["echo", ["hello"], [stderr_to_stdout: true]]})
+      {:ok, _pid} = start_supervised(daemon_spec("echo", ["hello"], stderr_to_stdout: true))
+
       wait_for_close_check()
       Logger.flush()
     end
@@ -48,10 +51,15 @@ defmodule DaemonTest do
   end
 
   test "daemon logs output to stderr when told" do
-    opts = [log_output: :error, stderr_to_stdout: true]
-
     fun = fn ->
-      {:ok, _pid} = start_supervised({Daemon, [test_path("echo_stderr.test"), [], opts]})
+      {:ok, _pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_stderr.test"), [],
+            log_output: :error,
+            stderr_to_stdout: true
+          )
+        )
+
       wait_for_close_check()
       Logger.flush()
     end
@@ -63,16 +71,13 @@ defmodule DaemonTest do
     fun = fn ->
       {:ok, _pid} =
         start_supervised(
-          {Daemon,
-           [
-             "env",
-             [],
-             [
-               log_output: :error,
-               stderr_to_stdout: true,
-               env: [{"MUONTRAP_TEST_VAR", "HELLO_THERE"}]
-             ]
-           ]}
+          daemon_spec(
+            "env",
+            [],
+            log_output: :error,
+            stderr_to_stdout: true,
+            env: [{"MUONTRAP_TEST_VAR", "HELLO_THERE"}]
+          )
         )
 
       wait_for_close_check()
@@ -119,12 +124,17 @@ defmodule DaemonTest do
       capture_log(fn ->
         {:ok, _pid} =
           start_supervised(
-            {Daemon, [test_path("succeed_second_time.test"), [tempfile], [log_output: :error]]},
-            restart: :permanent
+            Supervisor.child_spec(
+              {Daemon, [test_path("succeed_second_time.test"), [tempfile], [log_output: :error]]},
+              restart: :permanent,
+              id: :test_daemon
+            )
           )
 
         # Give it time to restart a few times.
         Process.sleep(500)
+
+        stop_supervised(:test_daemon)
 
         Logger.flush()
       end)
@@ -140,12 +150,12 @@ defmodule DaemonTest do
   test "can start daemon with cgroups" do
     {:ok, pid} =
       start_supervised(
-        {Daemon,
-         [
-           test_path("do_nothing.test"),
-           [],
-           [cgroup_base: "muontrap_test", cgroup_controllers: ["memory"]]
-         ]}
+        daemon_spec(
+          test_path("do_nothing.test"),
+          [],
+          cgroup_base: "muontrap_test",
+          cgroup_controllers: ["memory"]
+        )
       )
 
     os_pid = Daemon.os_pid(pid)

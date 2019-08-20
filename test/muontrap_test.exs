@@ -18,7 +18,9 @@ defmodule MuonTrapTest do
 
   test "closing the port kills a process that ignores sigterm" do
     port =
-      Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["test/ignore_sigterm.test"])
+      Port.open({:spawn_executable, MuonTrap.muontrap_path()},
+        args: ["--delay-to-sigkill", "1000", "test/ignore_sigterm.test"]
+      )
 
     os_pid = os_pid(port)
     assert_os_pid_running(os_pid)

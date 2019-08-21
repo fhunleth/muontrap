@@ -3,9 +3,25 @@ defmodule MuonTrapTest do
 
   doctest MuonTrap
 
-  test "closing the port kills the process" do
+  defp run_muontrap(args) do
+    # Directly invoke the muontrap port to reduce the amount of code
+    # to debug if something breaks.
     port =
-      Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["./test/do_nothing.test"])
+      Port.open(
+        {:spawn_executable, MuonTrap.muontrap_path()},
+        args: args
+      )
+
+    # The port starts asynchronously. If the test needs to register
+    # a signal handler, this is problematic since we can beat it.
+    # The right answer is to handshake with our test helper app.
+    # Since that's work, sleep briefly.
+    Process.sleep(10)
+    port
+  end
+
+  test "closing the port kills the process" do
+    port = run_muontrap(["./test/do_nothing.test"])
 
     os_pid = os_pid(port)
     assert_os_pid_running(os_pid)
@@ -17,10 +33,7 @@ defmodule MuonTrapTest do
   end
 
   test "closing the port kills a process that ignores sigterm" do
-    port =
-      Port.open({:spawn_executable, MuonTrap.muontrap_path()},
-        args: ["--delay-to-sigkill", "1000", "test/ignore_sigterm.test"]
-      )
+    port = run_muontrap(["--delay-to-sigkill", "1000", "test/ignore_sigterm.test"])
 
     os_pid = os_pid(port)
     assert_os_pid_running(os_pid)
@@ -31,12 +44,9 @@ defmodule MuonTrapTest do
   end
 
   test "delaying the SIGKILL" do
-    port =
-      Port.open(
-        {:spawn_executable, MuonTrap.muontrap_path()},
-        args: ["--delay-to-sigkill", "250000", "test/ignore_sigterm.test"]
-      )
+    port = run_muontrap(["--delay-to-sigkill", "250000", "test/ignore_sigterm.test"])
 
+    Process.sleep(10)
     os_pid = os_pid(port)
     assert_os_pid_running(os_pid)
     Port.close(port)

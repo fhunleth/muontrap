@@ -4,10 +4,6 @@ defmodule DaemonTest do
 
   alias MuonTrap.Daemon
 
-  defp test_path(cmd) do
-    Path.join([File.cwd!(), "test", cmd])
-  end
-
   defp daemon_spec(cmd, args) do
     Supervisor.child_spec({Daemon, [cmd, args]}, id: :test_daemon)
   end

@@ -10,6 +10,11 @@ defmodule MuonTrapTest.Case do
 
   @timeout_before_close_check 20
 
+  @spec test_path(Path.t()) :: Path.t()
+  def test_path(cmd) do
+    Path.join([File.cwd!(), "test", cmd])
+  end
+
   @spec cpu_cgroup_exists(String.t()) :: boolean
   def cpu_cgroup_exists(path) do
     {rc, 0} = System.cmd("cgget", ["-g", "cpu", path], stderr_to_stdout: true)

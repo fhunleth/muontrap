@@ -497,9 +497,22 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
                 int status;
                 pid_t dying_pid = wait(&status);
                 if (dying_pid == child_pid) {
-                    int exit_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-                    INFO("main child exited. status=%d, our exit code: %d", status, exit_status);
+                    // Let the caller know that the child isn't running and has been cleaned up
                     *still_running = 0;
+
+                    int exit_status;
+                    if (WIFSIGNALED(status)) {
+                        // Crash on signal, return the signal in the exit status. See POSIX:
+                        // http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_08_02
+                        exit_status = 128 + WTERMSIG(status);
+                        INFO("child terminated via signal %d. our exit status: %d", status, exit_status);
+                    } else if (WIFEXITED(status)) {
+                        exit_status = WEXITSTATUS(status);
+                        INFO("child exited with exit status: %d", exit_status);
+                    } else {
+                        INFO("child terminated with unexpected status: %d", status);
+                        exit_status = EXIT_FAILURE;
+                    }
                     return exit_status;
                 } else {
                     INFO("something else caused sigchild: pid=%d, status=%d. our child=%d", dying_pid, status, child_pid);

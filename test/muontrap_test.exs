@@ -116,6 +116,11 @@ defmodule MuonTrapTest do
     File.rm_rf!(@tmp_path)
   end
 
+  test "signals return an exit code of 128 + signal" do
+    # SIGTERM == 15
+    assert {"", 128 + 15} == MuonTrap.cmd(test_path("kill_self_with_signal.test"), [])
+  end
+
   test "README.md version is up to date" do
     app = :muontrap
     app_version = Application.spec(app, :vsn) |> to_string()

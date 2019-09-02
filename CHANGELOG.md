@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.5.0-rc.0
+## v0.5.0
 
 This update contains many changes throughout. If you're using cgroups, please
 review the changes as they likely affect your code.
@@ -24,6 +24,8 @@ review the changes as they likely affect your code.
 * Bug fixes
   * Forcefully killed processes would get stuck in a zombie state until the kill
     timeout expired due to a missing call to wait(2). This has been fixed.
+  * Exit status of process killed by a signal reflects that. I.e., a process
+    killed by a signal exits with a status of 128+signal.
 
 ## v0.4.4
 

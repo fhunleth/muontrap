@@ -24,7 +24,7 @@ Add `muontrap` to your project's `mix.exs` dependency list:
 ```elixir
 def deps do
   [
-    {:muontrap, "~> 0.4"}
+    {:muontrap, "~> 0.5.0"}
   ]
 end
 ```

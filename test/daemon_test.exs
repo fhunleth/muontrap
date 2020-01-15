@@ -63,6 +63,20 @@ defmodule DaemonTest do
     assert capture_log(fun) =~ "stderr message"
   end
 
+  test "daemon logs to a custom prefix" do
+    fun = fn ->
+      {:ok, _pid} =
+        start_supervised(
+          daemon_spec("echo", ["hello"], log_output: :error, log_prefix: "echo says: ")
+        )
+
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "echo says: hello"
+  end
+
   test "can pass environment variables to the daemon" do
     fun = fn ->
       {:ok, _pid} =

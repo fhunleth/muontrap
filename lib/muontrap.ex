@@ -47,7 +47,7 @@ defmodule MuonTrap do
   @doc ~S"""
   Executes a command like `System.cmd/3` via the `muontrap` wrapper.
 
-  # Options
+  ## Options
 
     * `:cgroup_controllers` - run the command under the specified cgroup controllers. Defaults to `[]`.
     * `:cgroup_base` - create a temporary path under the specified cgroup path
@@ -70,7 +70,7 @@ defmodule MuonTrap do
       The default can be set on system startup by passing the "+spp" argument
       to `--erl`.
 
-  # Examples
+  ## Examples
 
   Run a command:
 

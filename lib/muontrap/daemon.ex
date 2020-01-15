@@ -25,6 +25,7 @@ defmodule MuonTrap.Daemon do
 
   * `:name` - Name the Daemon GenServer
   * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
+  * `:log_prefix` - Prefix each log message with this string (defaults to the program's path)
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
 
   If you want to run multiple `MuonTrap.Daemon`s under one supervisor, they'll
@@ -38,7 +39,7 @@ defmodule MuonTrap.Daemon do
   defmodule State do
     @moduledoc false
 
-    defstruct [:command, :port, :cgroup_path, :log_output]
+    defstruct [:command, :port, :cgroup_path, :log_output, :log_prefix]
   end
 
   def child_spec([command, args]) do
@@ -106,7 +107,8 @@ defmodule MuonTrap.Daemon do
        command: command,
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
-       log_output: Map.get(options, :log_output)
+       log_output: Map.get(options, :log_output),
+       log_prefix: Map.get(options, :log_prefix, command <> ": ")
      }}
   end
 
@@ -145,9 +147,9 @@ defmodule MuonTrap.Daemon do
   @impl true
   def handle_info(
         {port, {:data, {_, message}}},
-        %State{port: port, log_output: log_level} = state
+        %State{port: port, log_output: log_level, log_prefix: prefix} = state
       ) do
-    _ = Logger.log(log_level, "#{state.command}: #{message}")
+    _ = Logger.log(log_level, [prefix, message])
     {:noreply, state}
   end
 

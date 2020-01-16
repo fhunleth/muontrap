@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.1
+
+* New features
+  * Added the `:log_prefix` option to MuonTrap.Daemon so that logged output can
+    be annotated in more helpful ways. This is useful when running the same
+    program multiple times, but with different configurations.
+
 ## v0.5.0
 
 This update contains many changes throughout. If you're using cgroups, please

@@ -8,7 +8,10 @@ matrix:
     include:
     - os: linux
       compiler: gcc
-      env: ELIXIR_VERSION=1.9.1-otp-22 ERLANG_VERSION=22.0 DOCS=true DIALYZER=true COVERALLS=true
+      env: ELIXIR_VERSION=1.10.2-otp-22 ERLANG_VERSION=22.3 DOCS=true DIALYZER=true COVERALLS=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.9.4-otp-22 ERLANG_VERSION=22.2.8 DOCS=true
     - os: linux
       compiler: gcc
       env: ELIXIR_VERSION=1.8.2-otp-22 ERLANG_VERSION=22.0 DOCS=true

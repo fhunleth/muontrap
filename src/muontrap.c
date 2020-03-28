@@ -585,8 +585,6 @@ int main(int argc, char *argv[])
         case 'k': // --delay-to-sigkill
             // Specified in microseconds for legacy reasons
             brutal_kill_wait_ms = strtoul(optarg, NULL, 0) / 1000;
-            if (brutal_kill_wait_ms > 1000)
-                errx(EXIT_FAILURE, "Delay to sending a SIGKILL must be < 1,000,000 (1 second)");
             break;
 
         case 's':

@@ -54,4 +54,4 @@ script:
   - if [ "$DOCS" = "true"; then MIX_ENV=docs mix docs; fi
   - mix format --check-formatted
   - MIX_ENV=docs mix hex.build
-  - if [ "$DIALYZER" = "true" ]; then mkdir -p ~/.mix; mix dialyzer --halt-exit-status; fi
+  - if [ "$DIALYZER" = "true" ]; then mkdir -p ~/.mix; mix dialyzer; fi

@@ -76,7 +76,7 @@ static void usage()
     printf("--controller,-c <cgroup controller> (may be specified multiple times)\n");
     printf("--group,-g <cgroup path>\n");
     printf("--set,-s <cgroup variable>=<value>\n (may be specified multiple times)\n");
-    printf("--delay-to-sigkill,-k <microseconds>\n");
+    printf("--delay-to-sigkill,-k <milliseconds>\n");
     printf("--uid <uid/user> drop privilege to this uid or user\n");
     printf("--gid <gid/group> drop privilege to this gid or group\n");
     printf("-- the program to run and its arguments come after this\n");
@@ -583,8 +583,7 @@ int main(int argc, char *argv[])
             exit(EXIT_SUCCESS);
 
         case 'k': // --delay-to-sigkill
-            // Specified in microseconds for legacy reasons
-            brutal_kill_wait_ms = strtoul(optarg, NULL, 0) / 1000;
+            brutal_kill_wait_ms = strtoul(optarg, NULL, 0);
             break;
 
         case 's':

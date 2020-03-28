@@ -33,7 +33,7 @@ defmodule MuonTrapTest do
   end
 
   test "closing the port kills a process that ignores sigterm" do
-    port = run_muontrap(["--delay-to-sigkill", "1000", "test/ignore_sigterm.test"])
+    port = run_muontrap(["--delay-to-sigkill", "1", "test/ignore_sigterm.test"])
 
     os_pid = os_pid(port)
     assert_os_pid_running(os_pid)
@@ -44,7 +44,7 @@ defmodule MuonTrapTest do
   end
 
   test "delaying the SIGKILL" do
-    port = run_muontrap(["--delay-to-sigkill", "250000", "test/ignore_sigterm.test"])
+    port = run_muontrap(["--delay-to-sigkill", "250", "test/ignore_sigterm.test"])
 
     Process.sleep(10)
     os_pid = os_pid(port)

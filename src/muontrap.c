@@ -387,7 +387,7 @@ static void cleanup_all_children()
     // The immediate child of muontrap will have either exited
     // at this point, so any other processes are orphaned descendents.
     // I.e., Their parent is now PID 1 and we won't get a SIGCHLD when
-    // they die. We only know who they are since they're in the cgruop.
+    // they die. We only know who they are since they're in the cgroup.
 
     // Send every child a SIGKILL
     int children_left = kill_children(SIGKILL);

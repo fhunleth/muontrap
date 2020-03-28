@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.6.0
+
+* Bug fixes
+  * Fix the `:delay_to_sigkill` option so that it takes milliseconds as
+    documented and remove the max delay check. Previously, the code used
+    microseconds for the delay despite the documentation. If you were using
+    `:delay_to_sigkill`, this is a backwards incompatible change and your delays
+    will be 1000x longer. Thanks to Almir for reporting this issue.
+
 ## v0.5.1
 
 * New features

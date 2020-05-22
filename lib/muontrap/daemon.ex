@@ -149,7 +149,7 @@ defmodule MuonTrap.Daemon do
         {port, {:data, {_, message}}},
         %State{port: port, log_output: log_level, log_prefix: prefix} = state
       ) do
-    _ = Logger.log(log_level, [prefix, message])
+    Logger.log(log_level, [prefix, message])
     {:noreply, state}
   end
 
@@ -158,11 +158,11 @@ defmodule MuonTrap.Daemon do
     reason =
       case status do
         0 ->
-          _ = Logger.info("#{state.command}: Process exited successfully")
+          Logger.info("#{state.command}: Process exited successfully")
           :normal
 
         _failure ->
-          _ = Logger.error("#{state.command}: Process exited with status #{status}")
+          Logger.error("#{state.command}: Process exited with status #{status}")
           :error_exit_status
       end
 

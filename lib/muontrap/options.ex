@@ -28,6 +28,7 @@ defmodule MuonTrap.Options do
   * `:cgroup_path`
   * `:cgroup_base`
   * `:delay_to_sigkill`
+  * `:force_close_port_after`
   * `:cgroup_sets`
   * `:uid`
   * `:gid`
@@ -120,6 +121,9 @@ defmodule MuonTrap.Options do
 
   defp validate_option(_any, {:delay_to_sigkill, delay}, opts) when is_integer(delay),
     do: Map.put(opts, :delay_to_sigkill, delay)
+
+  defp validate_option(_any, {:force_close_port_after, delay}, opts) when is_integer(delay),
+    do: Map.put(opts, :force_close_port_after, delay)
 
   defp validate_option(_any, {:cgroup_sets, sets}, opts) when is_list(sets),
     do: Map.put(opts, :cgroup_sets, sets)

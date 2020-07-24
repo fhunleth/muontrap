@@ -54,6 +54,7 @@ defmodule MuonTrap do
     * `:cgroup_path` - explicitly specify a path to use. Use `:cgroup_base`, unless you must control the path.
     * `:cgroup_sets` - set a cgroup controller parameter before running the command
     * `:delay_to_sigkill` - milliseconds before sending a SIGKILL to a child process if it doesn't exit with a SIGTERM (default 500 ms)
+    * `:force_close_port_after` - milliseconds before sending forcing the closing of a `Port`. Unless specified, the `Port` will never be closed (by us)
     * `:uid` - run the command using the specified uid or username
     * `:gid` - run the command using the specified gid or group
 

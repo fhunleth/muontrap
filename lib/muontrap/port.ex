@@ -1,6 +1,8 @@
 defmodule MuonTrap.Port do
   @moduledoc false
 
+  @force_port_close -11
+
   @spec muontrap_path() :: String.t()
   def muontrap_path() do
     Application.app_dir(:muontrap, ["priv", "muontrap"])
@@ -18,7 +20,9 @@ defmodule MuonTrap.Port do
     {initial, fun} = Collectable.into(options.into)
 
     try do
-      do_cmd(Port.open({:spawn_executable, to_charlist(muontrap_path())}, opts), initial, fun)
+      port = Port.open({:spawn_executable, to_charlist(muontrap_path())}, opts)
+      if force_close_port?(options), do: send_port_close_after(port, Map.get(options, :force_close_port_after))
+      do_cmd(port, initial, fun)
     catch
       kind, reason ->
         fun.(initial, :halt)
@@ -30,6 +34,9 @@ defmodule MuonTrap.Port do
 
   defp do_cmd(port, acc, fun) do
     receive do
+      {:force_close_port_after, port} ->
+        Port.close(port)
+        {"", @force_port_close}
       {^port, {:data, data}} ->
         do_cmd(port, fun.(acc, {:cont, data}), fun)
 
@@ -77,4 +84,11 @@ defmodule MuonTrap.Port do
   defp port_option({:arg0, bin}), do: [{:arg0, bin}]
   defp port_option({:parallelism, bool}), do: [{:parallelism, bool}]
   defp port_option(_other), do: []
+
+  defp force_close_port?(%{force_close_port_after: delay}) when is_integer(delay), do: true
+  defp force_close_port?(_), do: false
+
+  defp send_port_close_after(port, delay) do
+    Process.send_after(self(), {:force_close_port_after, port}, delay)
+  end
 end

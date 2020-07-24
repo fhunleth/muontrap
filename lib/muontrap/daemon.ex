@@ -2,22 +2,54 @@ defmodule MuonTrap.Daemon do
   use GenServer
 
   require Logger
-  alias MuonTrap.Options
 
   @moduledoc """
-  Wrap an OS process in a GenServer so that it can be supervised
+  Wrap an OS process in a GenServer so that it can be supervised.
+
+  For example, in your children list add MuonTrap.Daemon like this:
+
+  ```elixir
+  children = [
+    {MuonTrap.Daemon, ["my_server", ["--options", "foo")], [cd: "/some_directory"]]}
+  ]
+
+  opts = [strategy: :one_for_one, name: MyApplication.Supervisor]
+  Supervisor.start_link(children, opts)
+  ```
+
+  In the `child_spec` tuple, the second element is a list that corresponds to
+  the `MuonTrap.cmd/3` parameters. I.e., The first item in the list is the
+  program to run, the second is a list of commandline arguments, and the third
+  is a list of options. The same options as `MuonTrap.cmd/3` are available with
+  the following additions:
+
+  * `:name` - Name the Daemon GenServer
+  * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
+  * `:log_prefix` - Prefix each log message with this string (defaults to the program's path)
+  * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
+
+  If you want to run multiple `MuonTrap.Daemon`s under one supervisor, they'll
+  all need unique IDs. Use `Supervisor.child_spec/2` like this:
+
+  ```elixir
+  Supervisor.child_spec({MuonTrap.Daemon, ["my_server"), []]}, id: :server1)
+  ```
   """
 
   defmodule State do
     @moduledoc false
 
-    defstruct [:command, :port, :group]
+    defstruct [:command, :port, :cgroup_path, :log_output, :log_prefix]
   end
 
-  def child_spec(opts) do
+  def child_spec([command, args]) do
+    child_spec([command, args, []])
+  end
+
+  def child_spec([command, args, opts]) do
     %{
       id: __MODULE__,
-      start: {__MODULE__, :start_link, opts},
+      start: {__MODULE__, :start_link, [command, args, opts]},
       type: :worker,
       restart: :permanent,
       shutdown: 500
@@ -29,67 +61,111 @@ defmodule MuonTrap.Daemon do
   """
   @spec start_link(binary(), [binary()], keyword()) :: GenServer.on_start()
   def start_link(command, args, opts \\ []) do
-    GenServer.start_link(__MODULE__, [command, args, opts])
+    {genserver_opts, opts} =
+      case Keyword.pop(opts, :name) do
+        {nil, _opts} -> {[], opts}
+        {name, new_opts} -> {[name: name], new_opts}
+      end
+
+    GenServer.start_link(__MODULE__, [command, args, opts], genserver_opts)
   end
 
   @doc """
   Get the value of the specified cgroup variable.
   """
-  @spec cgget(pid(), binary(), binary()) :: binary()
-  def cgget(pid, controller, variable_name) do
-    GenServer.call(pid, {:cgget, controller, variable_name})
+  @spec cgget(GenServer.server(), binary(), binary()) ::
+          {:ok, String.t()} | {:error, File.posix()}
+  def cgget(server, controller, variable_name) do
+    GenServer.call(server, {:cgget, controller, variable_name})
   end
 
   @doc """
   Modify a cgroup variable.
   """
-  @spec cgset(pid(), binary(), binary(), binary()) :: :ok | no_return()
-  def cgset(pid, controller, variable_name, value) do
-    GenServer.call(pid, {:cgset, controller, variable_name, value})
+  @spec cgset(GenServer.server(), binary(), binary(), binary()) :: :ok | {:error, File.posix()}
+  def cgset(server, controller, variable_name, value) do
+    GenServer.call(server, {:cgset, controller, variable_name, value})
   end
 
   @doc """
   Return the OS pid to the muontrap executable.
   """
-  @spec os_pid(pid()) :: non_neg_integer()
-  def os_pid(pid) do
-    GenServer.call(pid, :os_pid)
+  @spec os_pid(GenServer.server()) :: non_neg_integer()
+  def os_pid(server) do
+    GenServer.call(server, :os_pid)
   end
 
+  @impl true
   def init([command, args, opts]) do
-    group = Keyword.get(opts, :group)
+    options = MuonTrap.Options.validate(:daemon, command, args, opts)
+    port_options = MuonTrap.Port.port_options(options) ++ [{:line, 256}]
 
-    {muontrap_args, leftover_opts} = Options.to_args(opts)
-    updated_args = muontrap_args ++ ["--", command] ++ args
-
-    port_options = [:exit_status, {:args, updated_args} | leftover_opts]
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
-    {:ok, %State{command: command, port: port, group: group}}
+    {:ok,
+     %State{
+       command: command,
+       port: port,
+       cgroup_path: Map.get(options, :cgroup_path),
+       log_output: Map.get(options, :log_output),
+       log_prefix: Map.get(options, :log_prefix, command <> ": ")
+     }}
   end
 
-  def handle_call({:cgget, controller, variable_name}, _from, state) do
-    result = System.cmd("cat", ["/sys/fs/cgroups/#{controller}/#{state.group}/#{variable_name}"])
+  alias MuonTrap.Cgroups
+
+  @impl true
+  def handle_call({:cgget, controller, variable_name}, _from, %{cgroup_path: cgroup_path} = state) do
+    result = Cgroups.cgget(controller, cgroup_path, variable_name)
+
     {:reply, result, state}
   end
 
-  def handle_call({:cgset, controller, variable_name, value}, _from, state) do
-    result = File.write!("/sys/fs/cgroups/#{controller}/#{state.group}/#{variable_name}", value)
+  @impl true
+  def handle_call(
+        {:cgset, controller, variable_name, value},
+        _from,
+        %{cgroup_path: cgroup_path} = state
+      ) do
+    result = Cgroups.cgset(controller, cgroup_path, variable_name, value)
+
     {:reply, result, state}
   end
 
+  @impl true
   def handle_call(:os_pid, _from, state) do
     {:os_pid, os_pid} = Port.info(state.port, :os_pid)
     {:reply, os_pid, state}
   end
 
-  def handle_info({port, {:data, message}}, %State{port: port} = state) do
-    Logger.debug("MuonTrap.Daemon(#{state.command}): #{inspect(message)}")
+  @impl true
+  def handle_info({_port, {:data, _}}, %State{log_output: nil} = state) do
+    # Ignore output
     {:noreply, state}
   end
 
+  @impl true
+  def handle_info(
+        {port, {:data, {_, message}}},
+        %State{port: port, log_output: log_level, log_prefix: prefix} = state
+      ) do
+    Logger.log(log_level, [prefix, message])
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info({port, {:exit_status, status}}, %State{port: port} = state) do
-    Logger.error("MuonTrap.Daemon(#{state.command}): Process exited with status #{status}")
-    {:stop, :normal, state}
+    reason =
+      case status do
+        0 ->
+          Logger.info("#{state.command}: Process exited successfully")
+          :normal
+
+        _failure ->
+          Logger.error("#{state.command}: Process exited with status #{status}")
+          :error_exit_status
+      end
+
+    {:stop, reason, state}
   end
 end

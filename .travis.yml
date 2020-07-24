@@ -4,23 +4,26 @@ language: c
 sudo: required
 dist: trusty
 
-os:
-    - linux
-    - osx
-
-compiler:
-    - gcc
-    - clang
-
 matrix:
-    exclude:
-        - os: osx
-          compiler: gcc
-        - os: linux
-          compiler: clang
-
-env:
-  - ELIXIR_VERSION=1.6.1 ERLANG_VERSION=20.1
+    include:
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.10.2-otp-22 ERLANG_VERSION=22.3 DOCS=true DIALYZER=true COVERALLS=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.9.4-otp-22 ERLANG_VERSION=22.2.8 DOCS=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.8.2-otp-22 ERLANG_VERSION=22.0 DOCS=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.7.4-otp-21 ERLANG_VERSION=21.3 DOCS=true
+    - os: linux
+      compiler: gcc
+      env: ELIXIR_VERSION=1.7.4-otp-20 ERLANG_VERSION=20.3.8
+    - os: osx
+      compiler: clang
+      env: DOCS=true
 
 before_install:
     - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
@@ -31,8 +34,8 @@ before_install:
         mkdir -p ~/otp && tar -xf erlang-$ERLANG_VERSION-nonroot.tar.bz2 -C ~/otp/;
         mkdir -p ~/.kerl;
         source $HOME/otp/$ERLANG_VERSION/activate;
-        wget https://github.com/elixir-lang/elixir/releases/download/v$ELIXIR_VERSION/Precompiled.zip;
-        unzip -d elixir Precompiled.zip;
+        wget https://repo.hex.pm/builds/elixir/v$ELIXIR_VERSION.zip;
+        unzip -d elixir v$ELIXIR_VERSION.zip;
       else
         brew update;
         brew install elixir;
@@ -43,8 +46,12 @@ before_script:
 
 script:
   - mix local.hex --force
+  - mix local.rebar --force
   - mix deps.get
   - mix compile
   - mix test
-  - mix docs
+  - if [ "$COVERALLS" = "true" ]; then MIX_ENV=test mix coveralls.travis; fi
+  - if [ "$DOCS" = "true"; then MIX_ENV=docs mix docs; fi
   - mix format --check-formatted
+  - MIX_ENV=docs mix hex.build
+  - if [ "$DIALYZER" = "true" ]; then mkdir -p ~/.mix; mix dialyzer; fi

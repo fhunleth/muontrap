@@ -1,21 +1,34 @@
 defmodule MuonTrap.MixProject do
   use Mix.Project
 
+  @version "0.6.0"
+  @source_url "https://github.com/fhunleth/muontrap"
+
   def project do
     [
       app: :muontrap,
-      version: "0.3.1",
-      elixir: "~> 1.6",
+      version: @version,
+      elixir: "~> 1.7",
       description: "Keep your ports contained",
-      source_url: "https://github.com/fhunleth/muontrap",
-      docs: [extras: ["README.md"], main: "readme"],
+      source_url: @source_url,
+      elixirc_paths: elixirc_paths(Mix.env()),
+      test_coverage: [tool: ExCoveralls],
+      docs: docs(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: [:elixir_make] ++ Mix.compilers(),
+      build_embedded: true,
+      compilers: [:elixir_make | Mix.compilers()],
+      make_targets: ["all"],
       make_clean: ["clean"],
+      dialyzer: [
+        flags: [:unmatched_returns, :error_handling, :race_conditions, :underspecs]
+      ],
       package: package()
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   def application do
     [extra_applications: [:logger]]
@@ -23,8 +36,19 @@ defmodule MuonTrap.MixProject do
 
   defp deps() do
     [
-      {:elixir_make, "~> 0.4", runtime: false},
-      {:ex_doc, "~> 0.11", only: :dev}
+      {:elixir_make, "~> 0.6", runtime: false},
+      {:ex_doc, "~> 0.19", only: :docs, runtime: false},
+      {:excoveralls, "~> 0.8", only: :test, runtime: false},
+      {:dialyxir, "~> 1.0.0", only: :dev, runtime: false}
+    ]
+  end
+
+  defp docs do
+    [
+      extras: ["README.md"],
+      main: "readme",
+      source_ref: "v#{@version}",
+      source_url: @source_url
     ]
   end
 
@@ -40,9 +64,8 @@ defmodule MuonTrap.MixProject do
         "LICENSE",
         "CHANGELOG.md"
       ],
-      maintainers: ["Frank Hunleth"],
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/fhunleth/muontrap"}
+      links: %{"GitHub" => @source_url}
     ]
   end
 end

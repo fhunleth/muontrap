@@ -1,53 +1,64 @@
 defmodule MuonTrapTest do
-  use ExUnit.Case
-  import MuonTrapTestHelpers
+  use MuonTrapTest.Case
 
   doctest MuonTrap
 
-  test "closing the port kills the process" do
-    port =
-      Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["./test/do_nothing.test"])
-
-    os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
-
-    Port.close(port)
-
-    wait_for_close_check()
-    assert !is_os_pid_around?(os_pid)
-  end
-
-  test "closing the port kills a process that ignores sigterm" do
-    port =
-      Port.open({:spawn_executable, MuonTrap.muontrap_path()}, args: ["test/ignore_sigterm.test"])
-
-    os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
-    Port.close(port)
-
-    wait_for_close_check()
-    assert !is_os_pid_around?(os_pid)
-  end
-
-  test "delaying the SIGKILL" do
+  defp run_muontrap(args) do
+    # Directly invoke the muontrap port to reduce the amount of code
+    # to debug if something breaks.
     port =
       Port.open(
         {:spawn_executable, MuonTrap.muontrap_path()},
-        args: ["--delay-to-sigkill", "250000", "test/ignore_sigterm.test"]
+        args: args
       )
 
+    # The port starts asynchronously. If the test needs to register
+    # a signal handler, this is problematic since we can beat it.
+    # The right answer is to handshake with our test helper app.
+    # Since that's work, sleep briefly.
+    Process.sleep(10)
+    port
+  end
+
+  test "closing the port kills the process" do
+    port = run_muontrap(["./test/do_nothing.test"])
+
     os_pid = os_pid(port)
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
+
+    Port.close(port)
+
+    wait_for_close_check()
+    assert_os_pid_exited(os_pid)
+  end
+
+  test "closing the port kills a process that ignores sigterm" do
+    port = run_muontrap(["--delay-to-sigkill", "1", "test/ignore_sigterm.test"])
+
+    os_pid = os_pid(port)
+    assert_os_pid_running(os_pid)
+    Port.close(port)
+
+    wait_for_close_check()
+    assert_os_pid_exited(os_pid)
+  end
+
+  test "delaying the SIGKILL" do
+    port = run_muontrap(["--delay-to-sigkill", "250", "test/ignore_sigterm.test"])
+
+    Process.sleep(10)
+    os_pid = os_pid(port)
+    assert_os_pid_running(os_pid)
     Port.close(port)
 
     Process.sleep(100)
     # process should be around for 250ms, so it should be around here.
-    assert is_os_pid_around?(os_pid)
+    assert_os_pid_running(os_pid)
 
     Process.sleep(200)
 
     # Now it should be gone
-    assert !is_os_pid_around?(os_pid)
+    assert_os_pid_exited(os_pid)
   end
 
   # The following tests are copied from System.cmd to help ensure that
@@ -73,7 +84,7 @@ defmodule MuonTrapTest do
   test "cmd/3 (with options)" do
     opts = [
       into: [],
-      cd: System.cwd!(),
+      cd: File.cwd!(),
       env: %{"foo" => "bar", "baz" => nil},
       arg0: "echo",
       stderr_to_stdout: true,
@@ -99,9 +110,22 @@ defmodule MuonTrapTest do
       end
 
       assert {"hello\n", 0} =
-               MuonTrap.cmd(Path.join(System.cwd!(), @echo), ["hello"], [{:arg0, "echo"}])
+               MuonTrap.cmd(Path.join(File.cwd!(), @echo), ["hello"], [{:arg0, "echo"}])
     end)
   after
     File.rm_rf!(@tmp_path)
+  end
+
+  test "signals return an exit code of 128 + signal" do
+    # SIGTERM == 15
+    assert {"", 128 + 15} == MuonTrap.cmd(test_path("kill_self_with_signal.test"), [])
+  end
+
+  test "README.md version is up to date" do
+    app = :muontrap
+    app_version = Application.spec(app, :vsn) |> to_string()
+    readme = File.read!("README.md")
+    [_, readme_version] = Regex.run(~r/{:#{app}, "(.+)"}/, readme)
+    assert Version.match?(app_version, readme_version)
   end
 end

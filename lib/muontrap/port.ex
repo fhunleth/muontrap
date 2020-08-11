@@ -35,7 +35,8 @@ defmodule MuonTrap.Port do
   defp do_cmd(port, acc, fun) do
     receive do
       {:force_close_port_after, port} ->
-        Port.close(port)
+        # Port.info/1 will return `nil` if the port is already closed
+        unless Port.info(port) == nil, do: Port.close(port)
         {"", @force_port_close}
       {^port, {:data, data}} ->
         do_cmd(port, fun.(acc, {:cont, data}), fun)

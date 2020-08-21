@@ -21,7 +21,10 @@ defmodule MuonTrap.Port do
 
     try do
       port = Port.open({:spawn_executable, to_charlist(muontrap_path())}, opts)
-      if force_close_port?(options), do: send_port_close_after(port, Map.get(options, :force_close_port_after))
+
+      if force_close_port?(options),
+        do: send_port_close_after(port, Map.get(options, :force_close_port_after))
+
       do_cmd(port, initial, fun)
     catch
       kind, reason ->
@@ -38,6 +41,7 @@ defmodule MuonTrap.Port do
         # Port.info/1 will return `nil` if the port is already closed
         unless Port.info(port) == nil, do: Port.close(port)
         {"", @force_port_close}
+
       {^port, {:data, data}} ->
         do_cmd(port, fun.(acc, {:cont, data}), fun)
 

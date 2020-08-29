@@ -8,7 +8,7 @@ defmodule ForceClosePortAfterTest do
 
   test "Test force_close_port_after" do
     ## Test that command currently not running
-    assert [] == :os.cmd('ps -e | grep force_close_port_after_test')
+    assert [] == :os.cmd('ps -e | grep [f]orce_close_port_after_test')
     assert File.exists?(@temp_output_file) == false
 
     ## run command

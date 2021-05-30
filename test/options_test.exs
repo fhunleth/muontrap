@@ -65,13 +65,14 @@ defmodule MuonTrap.OptionsTest do
     end
 
     raise_msg = "Invalid :msg_callback, only functions with /1 arity are allowed"
+
     assert_raise ArgumentError, raise_msg, fn ->
       Options.validate(:daemon, "echo", [], msg_callback: &Kernel.+/2)
     end
 
     :daemon
     |> Options.validate("echo", [], msg_callback: &inspect/1)
-    |> Map.get(:msg_callback) 
+    |> Map.get(:msg_callback)
     |> Kernel.==(&inspect/1)
     |> assert()
   end

@@ -142,9 +142,9 @@ defmodule MuonTrap.Daemon do
 
   @impl true
   def handle_info(
-        {port, {:data, {_, message}}}, 
+        {port, {:data, {_, message}}},
         %State{port: port, log_output: nil, msg_callback: msg_callback} = state
-        ) do
+      ) do
     dispatch_message(msg_callback, message)
     {:noreply, state}
   end
@@ -152,7 +152,8 @@ defmodule MuonTrap.Daemon do
   @impl true
   def handle_info(
         {port, {:data, {_, message}}},
-        %State{port: port, log_output: log_level, log_prefix: prefix, msg_callback: msg_callback} = state
+        %State{port: port, log_output: log_level, log_prefix: prefix, msg_callback: msg_callback} =
+          state
       ) do
     Logger.log(log_level, [prefix, message])
     dispatch_message(msg_callback, message)

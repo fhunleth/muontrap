@@ -80,9 +80,7 @@ defmodule DaemonTest do
   test "daemon dispatch the message to msg_callback" do
     fun = fn ->
       {:ok, _pid} =
-        start_supervised(
-          daemon_spec("echo", ["hello"], msg_callback: &msg_test_callback/1)
-        )
+        start_supervised(daemon_spec("echo", ["hello"], msg_callback: &msg_test_callback/1))
 
       wait_for_close_check()
       Logger.flush()
@@ -190,7 +188,7 @@ defmodule DaemonTest do
     assert memory > 1000
   end
 
-  def msg_test_callback(msg) do 
+  def msg_test_callback(msg) do
     require Logger
     Logger.log(:info, ["msg_callback echo says: ", msg])
   end

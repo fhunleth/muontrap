@@ -108,12 +108,13 @@ defmodule MuonTrap.Options do
     do: Map.put(opts, :log_prefix, prefix)
 
   defp validate_option(:daemon, {:msg_callback, nil}, opts), do: opts
+
   defp validate_option(:daemon, {:msg_callback, function}, opts) when is_function(function) do
     with function_info <- Function.info(function),
          true <- function_info[:arity] == 1 do
       Map.put(opts, :msg_callback, function)
     else
-      _arity_match_error -> 
+      _arity_match_error ->
         raise(ArgumentError, "Invalid :msg_callback, only functions with /1 arity are allowed")
     end
   end

@@ -77,6 +77,20 @@ defmodule DaemonTest do
     assert capture_log(fun) =~ "echo says: hello"
   end
 
+  test "daemon dispatch the message to msg_callback" do
+    fun = fn ->
+      {:ok, _pid} =
+        start_supervised(
+          daemon_spec("echo", ["hello"], msg_callback: &msg_test_callback/1)
+        )
+
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "msg_callback echo says: hello"
+  end
+
   test "can pass environment variables to the daemon" do
     fun = fn ->
       {:ok, _pid} =
@@ -174,5 +188,10 @@ defmodule DaemonTest do
     {:ok, memory_str} = Daemon.cgget(pid, "memory", "memory.limit_in_bytes")
     memory = Integer.parse(memory_str)
     assert memory > 1000
+  end
+
+  def msg_test_callback(msg) do 
+    require Logger
+    Logger.log(:info, ["msg_callback echo says: ", msg])
   end
 end

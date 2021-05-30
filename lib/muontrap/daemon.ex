@@ -23,23 +23,24 @@ defmodule MuonTrap.Daemon do
   is a list of options. The same options as `MuonTrap.cmd/3` are available with
   the following additions:
 
-  * `:name` - Name the Daemon GenServer
-  * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
-  * `:log_prefix` - Prefix each log message with this string (defaults to the program's path)
+  * `:name` - Name the Daemon GenServer.
+  * `:msg_callback` - When set, it sends the output from the command to the callback. Only funtions with /1 arity are allowed.
+  * `:log_output` - When set, it sends the output from the command to the Logger. Specify the log level (e.g., `:debug`).
+  * `:log_prefix` - Prefix each log message with this string (defaults to the program's path).
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
 
   If you want to run multiple `MuonTrap.Daemon`s under one supervisor, they'll
   all need unique IDs. Use `Supervisor.child_spec/2` like this:
 
   ```elixir
-  Supervisor.child_spec({MuonTrap.Daemon, ["my_server"), []]}, id: :server1)
+  Supervisor.child_spec({MuonTrap.Daemon, ["my_server", []]}, id: :server1)
   ```
   """
 
   defmodule State do
     @moduledoc false
 
-    defstruct [:command, :port, :cgroup_path, :log_output, :log_prefix]
+    defstruct [:command, :port, :cgroup_path, :log_output, :log_prefix, :msg_callback]
   end
 
   def child_spec([command, args]) do
@@ -107,6 +108,7 @@ defmodule MuonTrap.Daemon do
        command: command,
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
+       msg_callback: Map.get(options, :msg_callback),
        log_output: Map.get(options, :log_output),
        log_prefix: Map.get(options, :log_prefix, command <> ": ")
      }}
@@ -139,17 +141,21 @@ defmodule MuonTrap.Daemon do
   end
 
   @impl true
-  def handle_info({_port, {:data, _}}, %State{log_output: nil} = state) do
-    # Ignore output
+  def handle_info(
+        {port, {:data, {_, message}}}, 
+        %State{port: port, log_output: nil, msg_callback: msg_callback} = state
+        ) do
+    dispatch_message(msg_callback, message)
     {:noreply, state}
   end
 
   @impl true
   def handle_info(
         {port, {:data, {_, message}}},
-        %State{port: port, log_output: log_level, log_prefix: prefix} = state
+        %State{port: port, log_output: log_level, log_prefix: prefix, msg_callback: msg_callback} = state
       ) do
     Logger.log(log_level, [prefix, message])
+    dispatch_message(msg_callback, message)
     {:noreply, state}
   end
 
@@ -168,4 +174,13 @@ defmodule MuonTrap.Daemon do
 
     {:stop, reason, state}
   end
+
+  @impl true
+  def handle_info(unhandled_msg, state) do
+    Logger.warn("Unhandled message: #{inspect(unhandled_msg)}")
+    {:noreply, state}
+  end
+
+  defp dispatch_message(nil, _message), do: :ok
+  defp dispatch_message(msg_callback, message), do: msg_callback.(message)
 end

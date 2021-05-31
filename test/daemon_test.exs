@@ -77,6 +77,19 @@ defmodule DaemonTest do
     assert capture_log(fun) =~ "echo says: hello"
   end
 
+  test "daemon logs unhandled messages" do
+    fun = fn ->
+      {:ok, _pid} = start_supervised(daemon_spec("echo", ["hello"], name: UnhandledMsg))
+
+      send(UnhandledMsg, "this is an unhandled msg")
+
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "Unhandled message: \"this is an unhandled msg\""
+  end
+
   test "daemon dispatch the message to msg_callback" do
     fun = fn ->
       {:ok, _pid} =

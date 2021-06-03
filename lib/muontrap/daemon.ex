@@ -32,7 +32,7 @@ defmodule MuonTrap.Daemon do
   all need unique IDs. Use `Supervisor.child_spec/2` like this:
 
   ```elixir
-  Supervisor.child_spec({MuonTrap.Daemon, ["my_server"), []]}, id: :server1)
+  Supervisor.child_spec({MuonTrap.Daemon, ["my_server", []]}, id: :server1)
   ```
   """
 

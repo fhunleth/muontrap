@@ -10,3 +10,5 @@ clean:
 	if [ -f test/Makefile ]; then $(MAKE) -C test clean; fi
 
 .PHONY: all clean calling_from_make
+
+.SILENT:

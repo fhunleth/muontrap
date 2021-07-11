@@ -36,9 +36,11 @@ install: $(PREFIX) $(BUILD) $(MUONTRAP)
 $(OBJ): Makefile
 
 $(BUILD)/%.o: %.c
+	@echo " CC $(notdir $@)"
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 $(MUONTRAP): $(OBJ)
+	@echo " LD $(notdir $@)"
 	$(CC) $^ $(LDFLAGS) -o $@
 
 $(PREFIX) $(BUILD):
@@ -48,3 +50,6 @@ clean:
 	$(RM) $(MUONTRAP) $(BUILD)/*.o
 
 .PHONY: all clean calling_from_make install
+
+# Don't echo commands unless the caller exports "V=1"
+${V}.SILENT:

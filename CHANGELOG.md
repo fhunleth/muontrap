@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.1
+
+This release has no code changes.
+
+* Improvements
+  * Clean up build prints, fix a doc typo, and update dependencies for fresher
+    docs.
+
 ## v0.6.0
 
 * Bug fixes

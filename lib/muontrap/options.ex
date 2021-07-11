@@ -151,9 +151,7 @@ defmodule MuonTrap.Options do
     case :binary.match(binary, "\0") do
       {_, _} ->
         raise ArgumentError,
-              "cannot execute #{operation(context)} for program with null byte, got: #{
-                inspect(binary)
-              }"
+              "cannot execute #{operation(context)} for program with null byte, got: #{inspect(binary)}"
 
       :nomatch ->
         :ok

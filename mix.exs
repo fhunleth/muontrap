@@ -23,7 +23,12 @@ defmodule MuonTrap.MixProject do
       dialyzer: [
         flags: [:unmatched_returns, :error_handling, :race_conditions, :underspecs]
       ],
-      package: package()
+      package: package(),
+      preferred_cli_env: %{
+        docs: :docs,
+        "hex.publish": :docs,
+        "hex.build": :docs
+      }
     ]
   end
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.0
+
+This release only changes the version number. It has no code changes.
+
 ## v0.6.1
 
 This release has no code changes.

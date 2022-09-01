@@ -16,7 +16,6 @@ defmodule MuonTrap.MixProject do
       docs: docs(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      build_embedded: true,
       compilers: [:elixir_make | Mix.compilers()],
       make_targets: ["all"],
       make_clean: ["clean"],

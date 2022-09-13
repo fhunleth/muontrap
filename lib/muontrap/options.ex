@@ -24,6 +24,7 @@ defmodule MuonTrap.Options do
   * `:name` - `MuonTrap.Daemon`-only
   * `:log_output` - `MuonTrap.Daemon`-only
   * `:log_prefix` - `MuonTrap.Daemon`-only
+  * `:log_transform` - `MuonTrap.Daemon`-only
   * `:cgroup_controllers`
   * `:cgroup_path`
   * `:cgroup_base`
@@ -105,6 +106,9 @@ defmodule MuonTrap.Options do
 
   defp validate_option(:daemon, {:log_prefix, prefix}, opts) when is_binary(prefix),
     do: Map.put(opts, :log_prefix, prefix)
+
+  defp validate_option(:daemon, {:log_transform, log_transform}, opts) when is_function(log_transform),
+    do: Map.put(opts, :log_transform, log_transform)
 
   # MuonTrap common options
   defp validate_option(_any, {:cgroup_controllers, controllers}, opts) when is_list(controllers),

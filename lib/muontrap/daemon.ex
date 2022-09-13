@@ -39,7 +39,7 @@ defmodule MuonTrap.Daemon do
   defmodule State do
     @moduledoc false
 
-    defstruct [:command, :port, :cgroup_path, :log_output, :log_prefix]
+    defstruct [:command, :port, :cgroup_path, :log_output, :log_prefix, :log_transform]
   end
 
   def child_spec([command, args]) do
@@ -108,7 +108,8 @@ defmodule MuonTrap.Daemon do
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
        log_output: Map.get(options, :log_output),
-       log_prefix: Map.get(options, :log_prefix, command <> ": ")
+       log_prefix: Map.get(options, :log_prefix, command <> ": "),
+       log_transform: Map.get(options, :log_transform, &Function.identity/1)
      }}
   end
 
@@ -147,9 +148,9 @@ defmodule MuonTrap.Daemon do
   @impl true
   def handle_info(
         {port, {:data, {_, message}}},
-        %State{port: port, log_output: log_level, log_prefix: prefix} = state
+        %State{port: port, log_output: log_level, log_prefix: prefix, log_transform: log_transform} = state
       ) do
-    Logger.log(log_level, [prefix, message])
+    Logger.log(log_level, [prefix, log_transform.(message)])
     {:noreply, state}
   end
 

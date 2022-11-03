@@ -35,6 +35,25 @@ defmodule DaemonTest do
     assert capture_log(fun) =~ "hello"
   end
 
+  test "daemon logs are passed through log_transform fn" do
+    fun = fn ->
+      {:ok, _pid} =
+        start_supervised(
+          daemon_spec(
+            "echo",
+            ["hello"],
+            log_output: :error,
+            log_transform: &String.replace(&1, "hello", "goodbye")
+          )
+        )
+
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "goodbye"
+  end
+
   test "daemon doesn't log output by default" do
     fun = fn ->
       {:ok, _pid} = start_supervised(daemon_spec("echo", ["hello"], stderr_to_stdout: true))

@@ -148,7 +148,12 @@ defmodule MuonTrap.Daemon do
   @impl true
   def handle_info(
         {port, {:data, {_, message}}},
-        %State{port: port, log_output: log_level, log_prefix: prefix, log_transform: log_transform} = state
+        %State{
+          port: port,
+          log_output: log_level,
+          log_prefix: prefix,
+          log_transform: log_transform
+        } = state
       ) do
     Logger.log(log_level, [prefix, log_transform.(message)])
     {:noreply, state}

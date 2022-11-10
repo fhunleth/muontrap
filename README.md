@@ -1,8 +1,7 @@
 # MuonTrap
 
-[![Build Status](https://travis-ci.org/fhunleth/muontrap.svg?branch=main)](https://travis-ci.org/fhunleth/muontrap)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/fhunleth/muontrap/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/fhunleth/muontrap/tree/main)
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
-[![Coverage Status](https://coveralls.io/repos/github/fhunleth/muontrap/badge.svg?branch=main)](https://coveralls.io/github/fhunleth/muontrap?branch=main)
 
 Keep programs, deamons, and applications launched from Erlang and Elixir
 contained and well-behaved. This lightweight library kills OS processes if the

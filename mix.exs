@@ -20,7 +20,7 @@ defmodule MuonTrap.MixProject do
       make_targets: ["all"],
       make_clean: ["clean"],
       dialyzer: [
-        flags: [:unmatched_returns, :error_handling, :race_conditions, :underspecs]
+        flags: [:missing_return, :extra_return, :unmatched_returns, :error_handling, :underspecs]
       ],
       package: package(),
       preferred_cli_env: %{

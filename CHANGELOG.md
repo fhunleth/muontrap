@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.0
+
+* New features
+  * Support transforming output from programs before sending to the log. See the
+    new `:log_transform` option. (@brunoro)
+
 ## v1.0.0
 
 This release only changes the version number. It has no code changes.

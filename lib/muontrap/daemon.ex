@@ -27,6 +27,7 @@ defmodule MuonTrap.Daemon do
   * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
   * `:log_prefix` - Prefix each log message with this string (defaults to the program's path)
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
+  * `:exit_status_to_reason` - Optional function to convert failure exit status to reason.
 
   If you want to run multiple `MuonTrap.Daemon`s under one supervisor, they'll
   all need unique IDs. Use `Supervisor.child_spec/2` like this:
@@ -39,7 +40,15 @@ defmodule MuonTrap.Daemon do
   defmodule State do
     @moduledoc false
 
-    defstruct [:command, :port, :cgroup_path, :log_output, :log_prefix, :log_transform]
+    defstruct [
+      :command,
+      :port,
+      :cgroup_path,
+      :log_output,
+      :log_prefix,
+      :log_transform,
+      :exit_status_to_reason
+    ]
   end
 
   def child_spec([command, args]) do
@@ -109,7 +118,9 @@ defmodule MuonTrap.Daemon do
        cgroup_path: Map.get(options, :cgroup_path),
        log_output: Map.get(options, :log_output),
        log_prefix: Map.get(options, :log_prefix, command <> ": "),
-       log_transform: Map.get(options, :log_transform, &Function.identity/1)
+       log_transform: Map.get(options, :log_transform, &Function.identity/1),
+       exit_status_to_reason:
+         Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end)
      }}
   end
 
@@ -160,7 +171,10 @@ defmodule MuonTrap.Daemon do
   end
 
   @impl true
-  def handle_info({port, {:exit_status, status}}, %State{port: port} = state) do
+  def handle_info(
+        {port, {:exit_status, status}},
+        %State{port: port, exit_status_to_reason: exit_status_to_reason} = state
+      ) do
     reason =
       case status do
         0 ->
@@ -169,7 +183,7 @@ defmodule MuonTrap.Daemon do
 
         _failure ->
           Logger.error("#{state.command}: Process exited with status #{status}")
-          :error_exit_status
+          exit_status_to_reason.(status)
       end
 
     {:stop, reason, state}

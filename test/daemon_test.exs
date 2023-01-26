@@ -175,6 +175,47 @@ defmodule DaemonTest do
     assert log =~ "Called 2 times"
   end
 
+  test "returns :error_exit_status for stop reason" do
+    {:ok, pid} = start_supervised(daemon_spec(test_path("kill_self_with_sigusr1.test"), []))
+
+    ref = Process.monitor(pid)
+
+    os_pid = Daemon.os_pid(pid)
+    assert_os_pid_exited(os_pid)
+
+    assert_receive {:DOWN, ^ref, :process, _object, :error_exit_status}
+
+    :ok = stop_supervised(:test_daemon)
+
+    wait_for_close_check()
+  end
+
+  test "supports mapping exit status to stop reason" do
+    {:ok, pid} =
+      start_supervised(
+        daemon_spec(test_path("kill_self_with_sigusr1.test"), [],
+          exit_status_to_reason: fn s ->
+            if s == 138 do
+              :error_exit_sigusr1
+            else
+              :error_exit_status
+            end
+          end
+        )
+      )
+
+    ref = Process.monitor(pid)
+
+    os_pid = Daemon.os_pid(pid)
+    assert_os_pid_exited(os_pid)
+
+    assert_receive {:DOWN, ^ref, :process, _object, :error_exit_sigusr1}
+
+    :ok = stop_supervised(:test_daemon)
+
+    wait_for_close_check()
+  end
+
   @tag :cgroup
   test "can start daemon with cgroups" do
     {:ok, pid} =

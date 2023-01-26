@@ -25,6 +25,7 @@ defmodule MuonTrap.Options do
   * `:log_output` - `MuonTrap.Daemon`-only
   * `:log_prefix` - `MuonTrap.Daemon`-only
   * `:log_transform` - `MuonTrap.Daemon`-only
+  * `:exit_status_to_reason` - `MuonTrap.Daemon`-only
   * `:cgroup_controllers`
   * `:cgroup_path`
   * `:cgroup_base`
@@ -110,6 +111,10 @@ defmodule MuonTrap.Options do
   defp validate_option(:daemon, {:log_transform, log_transform}, opts)
        when is_function(log_transform),
        do: Map.put(opts, :log_transform, log_transform)
+
+  defp validate_option(:daemon, {:exit_status_to_reason, exit_status_to_reason}, opts)
+       when is_function(exit_status_to_reason),
+       do: Map.put(opts, :exit_status_to_reason, exit_status_to_reason)
 
   # MuonTrap common options
   defp validate_option(_any, {:cgroup_controllers, controllers}, opts) when is_list(controllers),

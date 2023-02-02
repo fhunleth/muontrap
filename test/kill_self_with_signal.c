@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2018 Frank Hunleth
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #include <err.h>
 #include <signal.h>
 #include <stdlib.h>

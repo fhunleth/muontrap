@@ -61,13 +61,13 @@ defmodule MuonTrap.MixProject do
     [
       files: [
         "CHANGELOG.md",
+        "README.md",
         "lib",
         "src/*.[ch]",
         "src/Makefile",
         "Makefile",
         "mix.exs",
-        "README.md",
-        "LICENSE"
+        "LICENSES/*"
       ],
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @source_url}

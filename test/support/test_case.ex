@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2018 Frank Hunleth
+#
+# SPDX-License-Identifier: Apache-2.0
+
 defmodule MuonTrapTest.Case do
   @moduledoc false
   use ExUnit.CaseTemplate

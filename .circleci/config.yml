@@ -4,6 +4,13 @@ latest: &latest
   pattern: "^1.14.3-erlang-25.*$"
 
 jobs:
+  check-license:
+    docker:
+      - image: fsfe/reuse:latest
+    steps:
+      - checkout
+      - run: reuse lint
+
   build-test:
     parameters:
       tag:
@@ -47,6 +54,7 @@ jobs:
 workflows:
   checks:
     jobs:
+      - check-license
       - build-test:
           name: << matrix.tag >>
           matrix:

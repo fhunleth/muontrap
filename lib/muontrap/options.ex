@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2018 Frank Hunleth
+#
+# SPDX-License-Identifier: Apache-2.0
+
 defmodule MuonTrap.Options do
   @moduledoc """
   Validate and normalize the options passed to MuonTrap.cmd/3 and MuonTrap.Daemon.start_link/3

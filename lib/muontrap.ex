@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2018 Frank Hunleth
+#
+# SPDX-License-Identifier: Apache-2.0
+
 defmodule MuonTrap do
   @moduledoc """
   MuonTrap protects you from lost and out of control OS processes.

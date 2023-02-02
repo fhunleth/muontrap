@@ -271,3 +271,15 @@ Then run:
 ```sh
 sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test
 ```
+
+## License
+
+All original source code in this project is licensed under Apache-2.0.
+
+Additionally, this project follows the [REUSE recommendations](https://reuse.software)
+and labels so that licensing and copyright are clear at the file level.
+
+Exceptions to Apache-2.0 licensing are:
+
+* Configuration and data files are licensed under CC0-1.0
+* Documentation is CC-BY-4.0

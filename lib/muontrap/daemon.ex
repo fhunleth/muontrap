@@ -1,8 +1,4 @@
 defmodule MuonTrap.Daemon do
-  use GenServer
-
-  require Logger
-
   @moduledoc """
   Wrap an OS process in a GenServer so that it can be supervised.
 
@@ -36,6 +32,11 @@ defmodule MuonTrap.Daemon do
   Supervisor.child_spec({MuonTrap.Daemon, ["my_server", []]}, id: :server1)
   ```
   """
+  use GenServer
+
+  alias MuonTrap.Cgroups
+
+  require Logger
 
   defmodule State do
     @moduledoc false
@@ -51,6 +52,7 @@ defmodule MuonTrap.Daemon do
     ]
   end
 
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec([command, args]) do
     child_spec([command, args, []])
   end
@@ -123,8 +125,6 @@ defmodule MuonTrap.Daemon do
          Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end)
      }}
   end
-
-  alias MuonTrap.Cgroups
 
   @impl true
   def handle_call({:cgget, controller, variable_name}, _from, %{cgroup_path: cgroup_path} = state) do

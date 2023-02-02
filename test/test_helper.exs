@@ -1,6 +1,7 @@
 ExUnit.start()
 
 defmodule MuonTrapTestHelpers do
+  @spec check_cgroup_support() :: :ok | no_return()
   def check_cgroup_support() do
     unless System.find_executable("cgget") do
       IO.puts(:stderr, "\nPlease install cgroup-tools so that cgcreate and cgget are available.")

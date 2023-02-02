@@ -38,6 +38,7 @@ defmodule MuonTrap.Port do
     end
   end
 
+  @spec port_options(MuonTrap.Options.t()) :: list()
   def port_options(options) do
     [
       :use_stdio,

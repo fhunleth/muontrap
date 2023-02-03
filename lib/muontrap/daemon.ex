@@ -24,10 +24,15 @@ defmodule MuonTrap.Daemon do
   the following additions:
 
   * `:name` - Name the Daemon GenServer
-  * `:log_output` - When set, send output from the command to the Logger. Specify the log level (e.g., `:debug`)
-  * `:log_prefix` - Prefix each log message with this string (defaults to the program's path)
-  * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout. Defaults to `false`.
-  * `:exit_status_to_reason` - Optional function to convert failure exit status to reason.
+  * `:log_output` - When set, send output from the command to the Logger.
+    Specify the log level (e.g., `:debug`)
+  * `:log_prefix` - Prefix each log message with this string (defaults to the
+    program's path)
+  * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout.
+    Defaults to `false`.
+  * `:exit_status_to_reason` - Optional function to convert the exit status (a
+    number) to stop reason for the Daemon GenServer. Use if error exit codes
+    carry information or aren't errors.
 
   If you want to run multiple `MuonTrap.Daemon`s under one supervisor, they'll
   all need unique IDs. Use `Supervisor.child_spec/2` like this:

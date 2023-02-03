@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.0
+
+* New feature
+  * Added `:exit_status_to_reason` to the `Daemon` to be able to change how the
+    `Daemon` GenServer exits based on the exit status of the program being run.
+    (@erauer)
+
 ## v1.1.0
 
 * New features

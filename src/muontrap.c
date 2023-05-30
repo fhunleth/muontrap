@@ -65,6 +65,10 @@ static uid_t run_as_uid = 0; // 0 means don't set, since we don't support privil
 static gid_t run_as_gid = 0; // 0 means don't set, since we don't support privilege escalation
 
 static int signal_pipe[2] = { -1, -1};
+static int stdout_pipe[2] = { -1, -1};
+static int stderr_pipe[2] = { -1, -1};
+
+static int last_poll_us;
 
 #define FOREACH_CONTROLLER for (struct controller_info *controller = controllers; controller != NULL; controller = controller->next)
 
@@ -142,6 +146,9 @@ static int fork_exec(const char *path, char *const *argv)
 
         if (run_as_uid > 0 && setuid(run_as_uid) < 0)
             err(EXIT_FAILURE, "setuid(%d)", run_as_uid);
+
+        dup2(stdout_pipe[1], STDOUT_FILENO);
+        dup2(stderr_pipe[1], STDERR_FILENO);
 
         execvp(path, argv);
 
@@ -469,20 +476,28 @@ static void add_controller_setting(struct controller_info *controller, const cha
 
 static int child_wait_loop(pid_t child_pid, int *still_running)
 {
-    struct pollfd fds[2];
+    struct pollfd fds[4];
     fds[0].fd = STDIN_FILENO;
     fds[0].events = POLLHUP; // POLLERR is implicit
     fds[1].fd = signal_pipe[0];
     fds[1].events = POLLIN;
 
+    fds[2].fd = stdout_pipe[1];
+    fds[2].events = POLLIN;
+
+    fds[3].fd = stderr_pipe[1];
+    fds[3].events = POLLIN;
+
     for (;;) {
-        if (poll(fds, 2, -1) < 0) {
+        if (poll(fds, 4, -1) < 0) {
             if (errno == EINTR)
                 continue;
 
             warn("poll");
             return EXIT_FAILURE;
         }
+
+        int current_us = microsecs();
 
         if (fds[0].revents) {
             INFO("stdin closed. cleaning up...");
@@ -534,6 +549,26 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
                 return EXIT_FAILURE;
             }
         }
+
+        int since_last_poll = current_us - last_poll_us;
+
+        if(fds[2].revents && since_last_poll >= 10) {
+            char buffer[1024];
+            ssize_t count = read(stdout_pipe[1], buffer, sizeof(buffer));
+            if (count > 0) {
+                write(stdout_pipe[0], buffer, count);
+            }
+        }
+
+        if(fds[3].revents && since_last_poll >= 10) {
+            char buffer[1024];
+            ssize_t count = read(stderr_pipe[1], buffer, sizeof(buffer));
+            if (count > 0) {
+                write(stderr_pipe[0], buffer, count);
+            }
+        }
+
+        last_poll_us = current_us;
     }
 }
 
@@ -655,6 +690,23 @@ int main(int argc, char *argv[])
     create_cgroups();
 
     update_cgroup_settings();
+
+    // pipe stdout and stderr
+    if (pipe(stdout_pipe) < 0)
+        err(EXIT_FAILURE, "pipe");
+    if (fcntl(stdout_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
+        fcntl(stdout_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
+        warn("fcntl(FD_CLOEXEC)");
+
+    stdout_pipe[0] = STDOUT_FILENO;
+        
+    if (pipe(stderr_pipe) < 0)
+        err(EXIT_FAILURE, "pipe");
+    if (fcntl(stderr_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
+        fcntl(stderr_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
+        warn("fcntl(FD_CLOEXEC)");
+
+    stderr_pipe[0] = STDERR_FILENO;
 
     const char *program_name = argv[optind];
     if (argv0)

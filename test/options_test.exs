@@ -27,7 +27,7 @@ defmodule MuonTrap.OptionsTest do
       assert catch_error(Options.validate(context, "__this_should_not_exist", [], [])) == :enoent
 
       assert_raise ArgumentError, fn ->
-        Options.validate(context, "echo", ['not_a_binary'], [])
+        Options.validate(context, "echo", [~c"not_a_binary"], [])
       end
 
       assert_raise ArgumentError, fn ->
@@ -90,7 +90,7 @@ defmodule MuonTrap.OptionsTest do
       assert Map.get(options, :uid) == 5
       assert Map.get(options, :gid) == "bill"
       assert Map.get(options, :delay_to_sigkill) == 1
-      assert Map.get(options, :env) == [{'KEY', 'VALUE'}, {'KEY2', 'VALUE2'}]
+      assert Map.get(options, :env) == [{~c"KEY", ~c"VALUE"}, {~c"KEY2", ~c"VALUE2"}]
       assert Map.get(options, :cgroup_controllers) == ["memory", "cpu"]
       assert Map.get(options, :cgroup_base) == "base"
       assert Map.get(options, :cgroup_sets) == [{"memory", "memory.limit_in_bytes", "268435456"}]

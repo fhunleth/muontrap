@@ -12,7 +12,6 @@ defmodule MuonTrapPortTest do
     assert port_options == [
              :use_stdio,
              :exit_status,
-             :binary,
              :hide,
              {:args, ["--", "/bin/echo", "1", "2", "3"]}
            ]
@@ -157,6 +156,23 @@ defmodule MuonTrapPortTest do
     assert Keyword.get(port_options, :args) == [
              "--delay-to-sigkill",
              "123",
+             "--",
+             "/bin/echo"
+           ]
+  end
+
+  test "parses log-limit" do
+    options = %{
+      cmd: "/bin/echo",
+      args: [],
+      log_limit: 1024
+    }
+
+    port_options = MuonTrap.Port.port_options(options)
+
+    assert Keyword.get(port_options, :args) == [
+             "--log-limit",
+             "1024",
              "--",
              "/bin/echo"
            ]

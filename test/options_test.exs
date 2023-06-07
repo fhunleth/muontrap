@@ -74,6 +74,7 @@ defmodule MuonTrap.OptionsTest do
       uid: 5,
       gid: "bill",
       delay_to_sigkill: 1,
+      log_limit: 1024,
       env: [{"KEY", "VALUE"}, {"KEY2", "VALUE2"}],
       cgroup_controllers: ["memory", "cpu"],
       cgroup_base: "base",
@@ -90,6 +91,7 @@ defmodule MuonTrap.OptionsTest do
       assert Map.get(options, :uid) == 5
       assert Map.get(options, :gid) == "bill"
       assert Map.get(options, :delay_to_sigkill) == 1
+      assert Map.get(options, :log_limit) == 1024
       assert Map.get(options, :env) == [{'KEY', 'VALUE'}, {'KEY2', 'VALUE2'}]
       assert Map.get(options, :cgroup_controllers) == ["memory", "cpu"]
       assert Map.get(options, :cgroup_base) == "base"

@@ -51,6 +51,7 @@ defmodule MuonTrap.Daemon do
     @moduledoc false
 
     defstruct [
+      :buffer,
       :command,
       :port,
       :cgroup_path,
@@ -118,12 +119,13 @@ defmodule MuonTrap.Daemon do
   @impl true
   def init([command, args, opts]) do
     options = MuonTrap.Options.validate(:daemon, command, args, opts)
-    port_options = MuonTrap.Port.port_options(options) ++ [{:line, 256}]
+    port_options = MuonTrap.Port.port_options(options) ++ [:stream]
 
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
     {:ok,
      %State{
+       buffer: [],
        command: command,
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
@@ -166,16 +168,11 @@ defmodule MuonTrap.Daemon do
   end
 
   @impl true
-  def handle_info(
-        {port, {:data, {_, message}}},
-        %State{
-          port: port,
-          log_output: log_level,
-          log_prefix: prefix,
-          log_transform: log_transform
-        } = state
-      ) do
-    Logger.log(log_level, [prefix, log_transform.(message)])
+  def handle_info({port, {:data, message}}, %State{port: port} = state) do
+    state = chunk_and_print(message, state)
+
+    MuonTrap.Port.report_bytes_handled(state.port, length(message))
+
     {:noreply, state}
   end
 
@@ -196,5 +193,17 @@ defmodule MuonTrap.Daemon do
       end
 
     {:stop, reason, state}
+  end
+
+  defp chunk_and_print([], state), do: state
+
+  defp chunk_and_print([?\n | rem], state) do
+    line = [Enum.reverse(state.buffer), ?\n]
+    Logger.log(state.log_output, [state.log_prefix, state.log_transform.(line)])
+    chunk_and_print(rem, %{state | buffer: []})
+  end
+
+  defp chunk_and_print([c | rem], state) do
+    chunk_and_print(rem, %{state | buffer: [c | state.buffer]})
   end
 end

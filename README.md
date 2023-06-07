@@ -260,6 +260,24 @@ for setting the `:id` and the `:restart` parameters:
       )
 ```
 
+## Output protections
+
+If using `MuonTrap.cmd/3` or logging enabled with `MuonTrap.Daemon.start_link/3`
+, then it is possible for the port process to flood the calling Elixir process
+with messages faster than it can handle. In those situations, the Elixir process
+mailbox will grow unbounded, filling the system memory until the BEAM eventually
+crashes with Out-Of-Memory (OOM) errors. This is most typically seen in smaller
+memory devices, like embedded systems.
+
+To counter this, a `:log_limit` option is supported to introduce flow control
+between the Elixir and port process. The port process will only log
+stderr/stdout back to the Elixir port up to the limit and wait for the Elixir
+process to report back how many bytes have been handled and are avialable for
+logging again. This flow control should provide enough push-back to prevent
+mailboxes overflowing memory.
+
+The default `:log_limit` is 10KB
+
 ## muontrap development
 
 In order to run the tests, some additional tools need to be installed.

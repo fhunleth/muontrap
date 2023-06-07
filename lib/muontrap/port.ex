@@ -18,7 +18,7 @@ defmodule MuonTrap.Port do
   """
   @spec cmd(MuonTrap.Options.t()) :: {Collectable.t(), exit_status :: non_neg_integer()}
   def cmd(options) do
-    opts = port_options(options)
+    opts = [:binary | port_options(options)]
     {initial, fun} = Collectable.into(options.into)
 
     try do
@@ -35,6 +35,7 @@ defmodule MuonTrap.Port do
   defp do_cmd(port, acc, fun) do
     receive do
       {^port, {:data, data}} ->
+        report_bytes_handled(port, byte_size(data))
         do_cmd(port, fun.(acc, {:cont, data}), fun)
 
       {^port, {:exit_status, status}} ->
@@ -47,7 +48,6 @@ defmodule MuonTrap.Port do
     [
       :use_stdio,
       :exit_status,
-      :binary,
       :hide,
       {:args, muontrap_args(options)} | Enum.flat_map(options, &port_option/1)
     ]
@@ -62,6 +62,7 @@ defmodule MuonTrap.Port do
   defp muontrap_arg({:uid, id}), do: ["--uid", to_string(id)]
   defp muontrap_arg({:gid, id}), do: ["--gid", to_string(id)]
   defp muontrap_arg({:arg0, arg0}), do: ["--arg0", arg0]
+  defp muontrap_arg({:log_limit, limit}), do: ["--log-limit", to_string(limit)]
 
   defp muontrap_arg({:cgroup_controllers, controllers}) do
     Enum.flat_map(controllers, fn controller -> ["--controller", controller] end)
@@ -82,4 +83,16 @@ defmodule MuonTrap.Port do
   defp port_option({:arg0, bin}), do: [{:arg0, bin}]
   defp port_option({:parallelism, bool}), do: [{:parallelism, bool}]
   defp port_option(_other), do: []
+
+  @spec report_bytes_handled(port(), pos_integer()) :: boolean()
+  def report_bytes_handled(port, count) when is_port(port) and is_integer(count) do
+    cmd = :binary.encode_unsigned(count, :little)
+    Port.command(port, cmd)
+  rescue
+    # A process may attempt to mark the bytes processed after the port has
+    # closed but before it received an :exit_status message. In those cases
+    # there command will fail with ArgumentError, but should be safe to
+    # ignore since we don't need to report anymore
+    ArgumentError -> false
+  end
 end

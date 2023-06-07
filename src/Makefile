@@ -19,6 +19,7 @@ MUONTRAP = $(PREFIX)/muontrap
 
 LDFLAGS +=
 CFLAGS ?= -O2 -Wall -Wextra -Wno-unused-parameter
+# _GNU_SOURCE is needed for splice(2) on Linux
 CFLAGS += -std=c99 -D_GNU_SOURCE
 
 #CFLAGS += -DDEBUG

@@ -161,4 +161,36 @@ defmodule MuonTrapPortTest do
              "/bin/echo"
            ]
   end
+
+  test "parses stdio-window" do
+    options = %{
+      cmd: "/bin/echo",
+      args: [],
+      stdio_window: 32
+    }
+
+    port_options = MuonTrap.Port.port_options(options)
+
+    assert Keyword.get(port_options, :args) == [
+             "--stdio-window",
+             "32",
+             "--",
+             "/bin/echo"
+           ]
+  end
+
+  defp encode_acks(number) do
+    number
+    |> MuonTrap.Port.encode_acks()
+    |> IO.iodata_to_binary()
+  end
+
+  test "ack calculation" do
+    assert encode_acks(1) == <<0>>
+    assert encode_acks(10) == <<9>>
+    assert encode_acks(256) == <<255>>
+    assert encode_acks(257) == <<255, 0>>
+    assert encode_acks(512) == <<255, 255>>
+    assert encode_acks(513) == <<255, 255, 0>>
+  end
 end

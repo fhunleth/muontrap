@@ -260,6 +260,20 @@ for setting the `:id` and the `:restart` parameters:
       )
 ```
 
+## stdio flow control
+
+The Erlang port feature does not implement flow control from messages coming
+from the port process. Since `MuonTrap` captures stdio from the program being
+run, it's possible that the program sends output so fast that it grows the
+Elixir process's mailbox big enough to cause an out-of-memory error.
+
+`MuonTrap` protects against this by implementing a flow control mechanism. When
+triggered, the running program's stdout and stderr file handles won't be read
+and hence it will eventually be blocked from writing to those handles.
+
+The `:stdio_window` option specifies the maximum number of unacknowledged bytes
+allowed. The default is 10 KB.
+
 ## muontrap development
 
 In order to run the tests, some additional tools need to be installed.

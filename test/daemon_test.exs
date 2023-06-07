@@ -278,4 +278,39 @@ defmodule DaemonTest do
     memory = Integer.parse(memory_str)
     assert memory > 1000
   end
+
+  test "flow control when logging" do
+    fun = fn ->
+      {:ok, _pid} =
+        start_supervised(
+          daemon_spec(test_path("print_a_lot.test"), [],
+            log_output: :error,
+            stdio_window: 101
+          )
+        )
+
+      wait_for_close_check(200)
+      Logger.flush()
+    end
+
+    results = capture_log(fun)
+
+    split =
+      String.split(results, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+    # Check that we have a log message for all 1000 lines plus the leftovers at the end.
+    assert length(split) == 1001
+  end
+
+  test "line splitting code" do
+    # Daemon.next_line(previous_leftovers, new_data) :: {line, leftovers}
+    assert {nil, "abcd"} == Daemon.next_line("", "abcd")
+    assert {"abcd", ""} == Daemon.next_line("", "abcd\n")
+    assert {"abcd", "\n"} == Daemon.next_line("", "abcd\n\n")
+    assert {"", "abcd"} == Daemon.next_line("\n", "abcd")
+    assert {"abcd", ""} == Daemon.next_line("ab", "cd\n")
+    assert {"a", "b\nc\nd\n"} == Daemon.next_line("a\nb\nc\n", "d\n")
+    assert {"a", "b\nc\nd\n"} == Daemon.next_line("a\n", "b\nc\nd\n")
+    assert {"a", "b\nc\nd\n"} == Daemon.next_line("a", "\nb\nc\nd\n")
+  end
 end

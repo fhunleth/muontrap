@@ -98,6 +98,27 @@ defmodule MuonTrapTest do
     assert {["hello\n"], 0} = MuonTrap.cmd("echo", ["hello"], opts)
   end
 
+  test "cmd/3 that prints a lot w/ default buffer" do
+    opts = [
+      parallelism: true
+    ]
+
+    {output, 0} = MuonTrap.cmd(test_path("print_a_lot.test"), [], opts)
+    split = String.split(output, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+    assert length(split) == 1001
+  end
+
+  test "cmd/3 that prints a lot w/ smaller buffer" do
+    opts = [
+      parallelism: true,
+      stdio_window: 63
+    ]
+
+    {output, 0} = MuonTrap.cmd(test_path("print_a_lot.test"), [], opts)
+    split = String.split(output, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+    assert length(split) == 1001
+  end
+
   # Test adapted from https://github.com/elixir-lang/elixir/blob/v1.15.0/lib/elixir/test/elixir/system_test.exs#L121
   @echo "echo-elixir-test"
   @tag :tmp_dir

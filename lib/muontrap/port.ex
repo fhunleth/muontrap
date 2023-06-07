@@ -35,6 +35,7 @@ defmodule MuonTrap.Port do
   defp do_cmd(port, acc, fun) do
     receive do
       {^port, {:data, data}} ->
+        report_bytes_handled(port, byte_size(data))
         do_cmd(port, fun.(acc, {:cont, data}), fun)
 
       {^port, {:exit_status, status}} ->
@@ -62,6 +63,7 @@ defmodule MuonTrap.Port do
   defp muontrap_arg({:uid, id}), do: ["--uid", to_string(id)]
   defp muontrap_arg({:gid, id}), do: ["--gid", to_string(id)]
   defp muontrap_arg({:arg0, arg0}), do: ["--arg0", arg0]
+  defp muontrap_arg({:stdio_window, count}), do: ["--stdio-window", to_string(count)]
 
   defp muontrap_arg({:cgroup_controllers, controllers}) do
     Enum.flat_map(controllers, fn controller -> ["--controller", controller] end)
@@ -82,4 +84,32 @@ defmodule MuonTrap.Port do
   defp port_option({:arg0, bin}), do: [{:arg0, bin}]
   defp port_option({:parallelism, bool}), do: [{:parallelism, bool}]
   defp port_option(_other), do: []
+
+  @spec report_bytes_handled(port(), pos_integer()) :: :ok
+  def report_bytes_handled(port, count) when is_port(port) and is_integer(count) do
+    cmd = encode_acks(count)
+    _ = Port.command(port, cmd)
+    :ok
+  rescue
+    # A process may attempt to mark the bytes processed after the port has
+    # closed but before it received an :exit_status message. In those cases
+    # the command will fail with ArgumentError, but should be safe to
+    # ignore since we don't need to report anymore
+    ArgumentError -> :ok
+  end
+
+  # Each acknowledgment is one unsigned byte that's the number of bytes to acknowledge
+  # plus 1. E.g., 0 means to acknowledge 1 byte. 255 means to acknowledge 256 bytes.
+  @spec encode_acks(pos_integer()) :: iodata()
+  def encode_acks(count) when count > 0 do
+    full_acks = div(count, 256)
+    partial_acks = rem(count, 256)
+    encode_acks_helper(full_acks, partial_acks)
+  end
+
+  defp encode_acks_helper(0, partial_acks), do: <<partial_acks - 1>>
+  defp encode_acks_helper(full_acks, 0), do: :binary.copy(<<255>>, full_acks)
+
+  defp encode_acks_helper(full_acks, partial_acks),
+    do: [:binary.copy(<<255>>, full_acks), partial_acks - 1]
 end

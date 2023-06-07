@@ -48,6 +48,7 @@ defmodule MuonTrap.Daemon do
   require Logger
 
   defstruct [
+    :buffer,
     :command,
     :port,
     :cgroup_path,
@@ -114,12 +115,13 @@ defmodule MuonTrap.Daemon do
   @impl GenServer
   def init([command, args, opts]) do
     options = MuonTrap.Options.validate(:daemon, command, args, opts)
-    port_options = MuonTrap.Port.port_options(options) ++ [{:line, 256}]
+    port_options = MuonTrap.Port.port_options(options) ++ [:stream]
 
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
     {:ok,
      %__MODULE__{
+       buffer: "",
        command: command,
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
@@ -164,17 +166,11 @@ defmodule MuonTrap.Daemon do
     {:noreply, state}
   end
 
-  @impl GenServer
-  def handle_info(
-        {port, {:data, {_, message}}},
-        %__MODULE__{
-          port: port,
-          log_output: log_level,
-          log_prefix: prefix,
-          log_transform: log_transform
-        } = state
-      ) do
-    Logger.log(log_level, [prefix, log_transform.(message)])
+  def handle_info({port, {:data, message}}, %__MODULE__{port: port} = state) do
+    state = split_and_log(message, state)
+
+    MuonTrap.Port.report_bytes_handled(state.port, byte_size(message))
+
     {:noreply, state}
   end
 
@@ -191,5 +187,30 @@ defmodule MuonTrap.Daemon do
       end
 
     {:stop, reason, state}
+  end
+
+  defp split_and_log(data, state) do
+    do_split_and_log(state.buffer, data, state)
+  end
+
+  defp do_split_and_log(leftovers, data, state) do
+    {line, remaining} = next_line(leftovers, data)
+
+    if line do
+      Logger.log(state.log_output, [state.log_prefix, state.log_transform.(line)])
+      do_split_and_log("", remaining, state)
+    else
+      %{state | buffer: remaining}
+    end
+  end
+
+  @spec next_line(String.t(), String.t()) :: {String.t() | nil, String.t()}
+  def next_line(leftovers, new_data) do
+    combined = leftovers <> new_data
+
+    case String.split(combined, "\n", parts: 2) do
+      [_] -> {nil, combined}
+      [line, remaining] -> {line, remaining}
+    end
   end
 end

@@ -77,7 +77,7 @@ defmodule MuonTrapTest do
 
   test "cmd/3 raises with non-binary arguments" do
     assert_raise ArgumentError, ~r"all arguments for MuonTrap.cmd/3 must be binaries", fn ->
-      MuonTrap.cmd("ls", ['/usr'])
+      MuonTrap.cmd("ls", [~c"/usr"])
     end
   end
 

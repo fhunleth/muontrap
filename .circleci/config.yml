@@ -1,7 +1,7 @@
 version: 2.1
 
 latest: &latest
-  pattern: "^1.15.0-rc.1-erlang-26.*$"
+  pattern: "^1.15.0-rc.1|26.*$"
 
 jobs:
   check-license:
@@ -15,15 +15,50 @@ jobs:
     parameters:
       tag:
         type: string
-    docker:
-      - image: hexpm/elixir:<< parameters.tag >>
+    machine:
+      image: ubuntu-2204:current
+      resource_class: medium
     working_directory: ~/repo
     environment:
       LC_ALL: C.UTF-8
     steps:
       - run:
           name: Install system dependencies
-          command: apk add --no-cache build-base
+          command: sudo apt-get install -y build-essential cgroup-tools
+      - run:
+          name: Install OTP
+          command: |
+            IFS='|' read -r ELIXIR_VERSION OTP_VERSION \<<< "<< parameters.tag >>"
+            OTP_INSTALL_PATH="/usr/local/otp/$OTP_VERSION"
+            sudo mkdir -p "$OTP_INSTALL_PATH"
+            sudo chown -R $(whoami):$(whoami) /usr/local/otp
+
+            # see https://builds.hex.pm/builds/otp/ubuntu-22.04/builds.txt ¬
+            wget -O /tmp/erlang.tar.gz "https://builds.hex.pm/builds/otp/ubuntu-22.04/OTP-${OTP_VERSION}.tar.gz"
+            tar -zxf /tmp/erlang.tar.gz -C "$OTP_INSTALL_PATH" --strip-components=1
+            "$OTP_INSTALL_PATH"/Install -minimal "$OTP_INSTALL_PATH"
+            echo "export PATH=$OTP_INSTALL_PATH/bin:$PATH" >> "$BASH_ENV"
+            source "$BASH_ENV"
+
+            erl -version
+
+      - run:
+          name: Install Elixir
+          command: |
+            IFS='|' read -r ELIXIR_VERSION OTP_VERSION \<<< "<< parameters.tag >>"
+            OTP_MAJOR=${OTP_VERSION%%.*}
+            ELIXIR_INSTALL_PATH="/usr/local/elixir/$ELIXIR_VERSION"
+            sudo mkdir -p "$ELIXIR_INSTALL_PATH"
+            sudo chown -R $(whoami):$(whoami) /usr/local/elixir
+
+            # See https://builds.hex.pm/builds/elixir/builds.txt ¬
+            wget -O /tmp/elixir.zip "https://builds.hex.pm/builds/elixir/v${ELIXIR_VERSION}-otp-${OTP_MAJOR}.zip"
+            unzip -q /tmp/elixir.zip -d "$ELIXIR_INSTALL_PATH"
+            echo "export PATH=$ELIXIR_INSTALL_PATH/bin:$PATH" >> "$BASH_ENV"
+            source "$BASH_ENV"
+
+            elixir -v
+
       - checkout
       - run:
           name: Install hex and rebar
@@ -32,8 +67,11 @@ jobs:
             mix local.rebar --force
       - restore_cache:
           keys:
-            - v1-mix-cache-<< parameters.tag >>-{{ checksum "mix.lock" }}
+            - v2-mix-cache-<< parameters.tag >>-{{ checksum "mix.lock" }}
       - run: mix deps.get
+      - run:
+          name: "Setup cgroups"
+          command: sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test
       - run: mix test
       - when:
           condition:
@@ -46,7 +84,7 @@ jobs:
             - run: mix credo -a --strict
             - run: mix dialyzer
       - save_cache:
-          key: v1-mix-cache-<< parameters.tag >>-{{ checksum "mix.lock" }}
+          key: v2-mix-cache-<< parameters.tag >>-{{ checksum "mix.lock" }}
           paths:
             - _build
             - deps
@@ -59,9 +97,9 @@ workflows:
           matrix:
             parameters:
               tag: [
-                1.15.0-rc.1-erlang-26.0-alpine-3.18.0,
-                1.14.5-erlang-25.3.2-alpine-3.18.0,
-                1.13.4-erlang-25.3.2-alpine-3.18.0,
-                1.12.3-erlang-24.3.4.11-alpine-3.18.0,
-                1.11.4-erlang-24.3.4.11-alpine-3.18.0
+                1.15.0-rc.1|26.0,
+                1.14.5|25.3.2,
+                1.13.4|25.3.2,
+                1.12.3|24.3.4.11,
+                1.11.4|24.3.4.11
               ]

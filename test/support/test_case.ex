@@ -23,7 +23,7 @@ defmodule MuonTrapTest.Case do
   @spec cpu_cgroup_exists(String.t()) :: boolean
   def cpu_cgroup_exists(path) do
     {rc, 0} = System.cmd("cgget", ["-g", "cpu", path], stderr_to_stdout: true)
-    String.match?(rc, ~r/cpu.shares/)
+    String.match?(rc, ~r/cpu.stat/)
   end
 
   @spec memory_cgroup_exists(String.t()) :: boolean

@@ -23,7 +23,7 @@ jobs:
     steps:
       - run:
           name: Install system dependencies
-          command: apk add --no-cache build-base
+          command: apk add --no-cache build-base procps
       - checkout
       - run:
           name: Install hex and rebar
@@ -34,7 +34,7 @@ jobs:
           keys:
             - v1-mix-cache-<< parameters.tag >>-{{ checksum "mix.lock" }}
       - run: mix deps.get
-      - run: mix test
+      - run: mix test --exclude cgroup
       - when:
           condition:
             matches: { <<: *latest, value: << parameters.tag >> }

@@ -10,7 +10,7 @@ defmodule MuonTrapTestHelpers do
     unless System.find_executable("cgget") do
       IO.puts(:stderr, "\nPlease install cgroup-tools so that cgcreate and cgget are available.")
       IO.puts(:stderr, "\nTo skip cgroup tests, run `mix test --exclude cgroup`")
-      System.halt(0)
+      System.halt(1)
     end
 
     unless MuonTrapTest.Case.cpu_cgroup_exists("muontrap_test") and
@@ -18,7 +18,7 @@ defmodule MuonTrapTestHelpers do
       IO.puts(:stderr, "\nPlease create the muontrap_test cgroup")
       IO.puts(:stderr, "sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test")
       IO.puts(:stderr, "\nTo skip cgroup tests, run `mix test --exclude cgroup`")
-      System.halt(0)
+      System.halt(1)
     end
   end
 

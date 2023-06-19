@@ -185,9 +185,9 @@ defmodule DaemonTest do
     ref = Process.monitor(pid)
 
     os_pid = Daemon.os_pid(pid)
-    assert_os_pid_exited(os_pid)
 
     assert_receive {:DOWN, ^ref, :process, _object, :error_exit_status}
+    assert_os_pid_exited(os_pid)
 
     :ok = stop_supervised(:test_daemon)
 
@@ -195,11 +195,23 @@ defmodule DaemonTest do
   end
 
   test "supports mapping exit status to stop reason" do
+    {signals, 0} = System.cmd("kill", ["-l"])
+
+    # Some systems may have SIGUSR1 == 10 and others
+    # SIGUSR1 == 30. Do a quick lookup for the expected
+    # signal mapping to decide which one to expect
+    sigusr1 =
+      String.split(signals)
+      |> Enum.with_index(129)
+      |> Enum.find_value(fn {k, s} -> if k == "USR1", do: s end)
+
+    assert is_integer(sigusr1)
+
     {:ok, pid} =
       start_supervised(
         daemon_spec(test_path("kill_self_with_sigusr1.test"), [],
           exit_status_to_reason: fn s ->
-            if s == 138 do
+            if s == sigusr1 do
               :error_exit_sigusr1
             else
               :error_exit_status
@@ -211,9 +223,9 @@ defmodule DaemonTest do
     ref = Process.monitor(pid)
 
     os_pid = Daemon.os_pid(pid)
-    assert_os_pid_exited(os_pid)
 
     assert_receive {:DOWN, ^ref, :process, _object, :error_exit_sigusr1}
+    assert_os_pid_exited(os_pid)
 
     :ok = stop_supervised(:test_daemon)
 

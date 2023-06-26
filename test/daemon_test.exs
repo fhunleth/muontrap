@@ -195,26 +195,19 @@ defmodule DaemonTest do
   end
 
   test "supports mapping exit status to stop reason" do
-    {signals, 0} = System.cmd("kill", ["-l"])
-
     # Some systems may have SIGUSR1 == 10 and others
     # SIGUSR1 == 30. Do a quick lookup for the expected
     # signal mapping to decide which one to expect
-    sigusr1 =
-      String.split(signals)
-      |> Enum.with_index(129)
-      |> Enum.find_value(fn {k, s} -> if k == "USR1", do: s end)
-
-    assert is_integer(sigusr1)
+    sigusr1 = s2n("USR1", 10)
 
     {:ok, pid} =
       start_supervised(
         daemon_spec(test_path("kill_self_with_sigusr1.test"), [],
           exit_status_to_reason: fn s ->
-            if s == sigusr1 do
+            if s == 128 + sigusr1 do
               :error_exit_sigusr1
             else
-              :error_exit_status
+              {:error_exit_status, s}
             end
           end
         )
@@ -230,6 +223,40 @@ defmodule DaemonTest do
     :ok = stop_supervised(:test_daemon)
 
     wait_for_close_check()
+  end
+
+  defp s2n(name, default) do
+    with :error <- s2n_kill_l_name(name),
+         :error <- s2n_kill_l(name) do
+      default
+    end
+  end
+
+  defp s2n_kill_l_name(name) do
+    with {results, 0} <- System.cmd("kill", ["-l", name], stderr_to_stdout: true),
+         {number, _} <- Integer.parse(results),
+         true <- is_integer(number) do
+      number
+    else
+      _ -> :error
+    end
+  end
+
+  defp s2n_kill_l(name) do
+    # Parse the result from MacOS kill.
+    #
+    # There are many formats for `kill -l` and this only supports the one on
+    # MacOS that we're getting.
+    case System.cmd("kill", ["-l"], stderr_to_stdout: true) do
+      {signals, 0} ->
+        String.split(signals)
+        |> Enum.with_index(1)
+        |> List.keyfind(name, 0, {:hack, :error})
+        |> elem(1)
+
+      _ ->
+        :error
+    end
   end
 
   @tag :cgroup

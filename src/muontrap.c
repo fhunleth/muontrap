@@ -484,10 +484,12 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
             return EXIT_FAILURE;
         }
 
-        if (fds[0].revents) {
-            INFO("stdin closed. cleaning up...");
+        if (fds[0].revents & POLLHUP) {
+            // Erlang signals that it's done by closing stdin. Exit immediately.
+            INFO("stdin closed. Exiting...");
             return EXIT_FAILURE;
         }
+
         if (fds[1].revents) {
             int signal;
             ssize_t amt = read(signal_pipe[0], &signal, sizeof(signal));

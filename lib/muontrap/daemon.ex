@@ -110,7 +110,7 @@ defmodule MuonTrap.Daemon do
   @doc """
   Return the OS pid to the muontrap executable.
   """
-  @spec os_pid(GenServer.server()) :: non_neg_integer()
+  @spec os_pid(GenServer.server()) :: non_neg_integer() | :error
   def os_pid(server) do
     GenServer.call(server, :os_pid)
   end
@@ -153,7 +153,12 @@ defmodule MuonTrap.Daemon do
   end
 
   def handle_call(:os_pid, _from, state) do
-    {:os_pid, os_pid} = Port.info(state.port, :os_pid)
+    os_pid =
+      case Port.info(state.port, :os_pid) do
+        {:os_pid, p} -> p
+        nil -> :error
+      end
+
     {:reply, os_pid, state}
   end
 

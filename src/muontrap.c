@@ -373,7 +373,7 @@ static int wait_for_sigchld(pid_t pid_to_match, int timeout_ms)
                 return -1;
 
             default:
-                warn("unexpected signal: %d", signal);
+                warnx("unexpected signal: %d", signal);
                 return -1;
             }
         }
@@ -436,7 +436,7 @@ static void kill_child_nicely(pid_t child)
             return;
 
         if (wait_for_sigchld(child, brutal_kill_wait_ms) < 0)
-            warn("SIGKILL didn't work on %d", child);
+            warnx("SIGKILL didn't work on %d", child);
     }
 }
 
@@ -530,7 +530,7 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
                 return EXIT_FAILURE;
 
             default:
-                warn("unexpected signal: %d", signal);
+                warnx("unexpected signal: %d", signal);
                 return EXIT_FAILURE;
             }
         }

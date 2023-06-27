@@ -115,7 +115,7 @@ defmodule MuonTrap.Daemon do
     GenServer.call(server, :os_pid)
   end
 
-  @impl true
+  @impl GenServer
   def init([command, args, opts]) do
     options = MuonTrap.Options.validate(:daemon, command, args, opts)
     port_options = MuonTrap.Port.port_options(options) ++ [{:line, 256}]
@@ -135,14 +135,13 @@ defmodule MuonTrap.Daemon do
      }}
   end
 
-  @impl true
+  @impl GenServer
   def handle_call({:cgget, controller, variable_name}, _from, %{cgroup_path: cgroup_path} = state) do
     result = Cgroups.cgget(controller, cgroup_path, variable_name)
 
     {:reply, result, state}
   end
 
-  @impl true
   def handle_call(
         {:cgset, controller, variable_name, value},
         _from,
@@ -153,19 +152,18 @@ defmodule MuonTrap.Daemon do
     {:reply, result, state}
   end
 
-  @impl true
   def handle_call(:os_pid, _from, state) do
     {:os_pid, os_pid} = Port.info(state.port, :os_pid)
     {:reply, os_pid, state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_info({_port, {:data, _}}, %State{log_output: nil} = state) do
     # Ignore output
     {:noreply, state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_info(
         {port, {:data, {_, message}}},
         %State{
@@ -179,7 +177,6 @@ defmodule MuonTrap.Daemon do
     {:noreply, state}
   end
 
-  @impl true
   def handle_info(
         {port, {:exit_status, status}},
         %State{port: port, exit_status_to_reason: exit_status_to_reason} = state

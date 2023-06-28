@@ -61,8 +61,8 @@ defmodule MuonTrap.MixProject do
         "CHANGELOG.md",
         "README.md",
         "lib",
-        "src/*.[ch]",
-        "src/Makefile",
+        "c_src/*.[ch]",
+        "c_src/Makefile",
         "Makefile",
         "mix.exs",
         "LICENSES/*"

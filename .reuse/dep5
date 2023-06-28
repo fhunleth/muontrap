@@ -11,6 +11,6 @@ Files: .gitignore .github/dependabot.yml .circleci/config.yml
 Copyright: None
 License: CC0-1.0
 
-Files: .formatter.exs mix.lock .credo.exs mix.exs Makefile src/Makefile test/Makefile
+Files: .formatter.exs mix.lock .credo.exs mix.exs Makefile c_src/Makefile test/Makefile
 Copyright: None
 License: CC0-1.0

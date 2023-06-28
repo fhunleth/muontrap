@@ -47,19 +47,15 @@ defmodule MuonTrap.Daemon do
 
   require Logger
 
-  defmodule State do
-    @moduledoc false
-
-    defstruct [
-      :command,
-      :port,
-      :cgroup_path,
-      :log_output,
-      :log_prefix,
-      :log_transform,
-      :exit_status_to_reason
-    ]
-  end
+  defstruct [
+    :command,
+    :port,
+    :cgroup_path,
+    :log_output,
+    :log_prefix,
+    :log_transform,
+    :exit_status_to_reason
+  ]
 
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec([command, args]) do
@@ -123,7 +119,7 @@ defmodule MuonTrap.Daemon do
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
     {:ok,
-     %State{
+     %__MODULE__{
        command: command,
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
@@ -163,7 +159,7 @@ defmodule MuonTrap.Daemon do
   end
 
   @impl GenServer
-  def handle_info({_port, {:data, _}}, %State{log_output: nil} = state) do
+  def handle_info({_port, {:data, _}}, %__MODULE__{log_output: nil} = state) do
     # Ignore output
     {:noreply, state}
   end
@@ -171,7 +167,7 @@ defmodule MuonTrap.Daemon do
   @impl GenServer
   def handle_info(
         {port, {:data, {_, message}}},
-        %State{
+        %__MODULE__{
           port: port,
           log_output: log_level,
           log_prefix: prefix,
@@ -182,10 +178,7 @@ defmodule MuonTrap.Daemon do
     {:noreply, state}
   end
 
-  def handle_info(
-        {port, {:exit_status, status}},
-        %State{port: port, exit_status_to_reason: exit_status_to_reason} = state
-      ) do
+  def handle_info({port, {:exit_status, status}}, %__MODULE__{port: port} = state) do
     reason =
       case status do
         0 ->
@@ -194,7 +187,7 @@ defmodule MuonTrap.Daemon do
 
         _failure ->
           Logger.error("#{state.command}: Process exited with status #{status}")
-          exit_status_to_reason.(status)
+          state.exit_status_to_reason.(status)
       end
 
     {:stop, reason, state}

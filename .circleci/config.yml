@@ -54,6 +54,7 @@ jobs:
 workflows:
   checks:
     jobs:
+      - check-license
       - build-test:
           name: << matrix.tag >>
           matrix:

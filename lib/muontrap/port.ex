@@ -18,7 +18,7 @@ defmodule MuonTrap.Port do
   """
   @spec cmd(MuonTrap.Options.t()) :: {Collectable.t(), exit_status :: non_neg_integer()}
   def cmd(options) do
-    opts = port_options(options)
+    opts = port_options(options, ["--capture-output"])
     {initial, fun} = Collectable.into(options.into)
 
     try do
@@ -43,14 +43,14 @@ defmodule MuonTrap.Port do
     end
   end
 
-  @spec port_options(MuonTrap.Options.t()) :: list()
-  def port_options(options) do
+  @spec port_options(MuonTrap.Options.t(), [String.t()]) :: list()
+  def port_options(options, args \\ []) do
     [
       :use_stdio,
       :exit_status,
       :binary,
       :hide,
-      {:args, muontrap_args(options)} | Enum.flat_map(options, &port_option/1)
+      {:args, args ++ muontrap_args(options)} | Enum.flat_map(options, &port_option/1)
     ]
   end
 
@@ -64,6 +64,8 @@ defmodule MuonTrap.Port do
   defp muontrap_arg({:gid, id}), do: ["--gid", to_string(id)]
   defp muontrap_arg({:arg0, arg0}), do: ["--arg0", arg0]
   defp muontrap_arg({:stdio_window, count}), do: ["--stdio-window", to_string(count)]
+  defp muontrap_arg({:stderr_to_stdout, true}), do: ["--capture-stderr"]
+  defp muontrap_arg({:log_output, _}), do: ["--capture-output"]
 
   defp muontrap_arg({:cgroup_controllers, controllers}) do
     Enum.flat_map(controllers, fn controller -> ["--controller", controller] end)
@@ -77,9 +79,7 @@ defmodule MuonTrap.Port do
 
   defp muontrap_arg(_other), do: []
 
-  defp port_option({:stderr_to_stdout, true}), do: [:stderr_to_stdout]
   defp port_option({:env, env}), do: [{:env, env}]
-
   defp port_option({:cd, bin}), do: [{:cd, bin}]
   defp port_option({:arg0, bin}), do: [{:arg0, bin}]
   defp port_option({:parallelism, bool}), do: [{:parallelism, bool}]

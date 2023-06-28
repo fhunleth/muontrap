@@ -63,6 +63,7 @@ defmodule DaemonTest do
       {:ok, _pid} = start_supervised(daemon_spec("echo", ["hello"], stderr_to_stdout: true))
 
       wait_for_close_check()
+
       Logger.flush()
     end
 
@@ -71,7 +72,7 @@ defmodule DaemonTest do
 
   test "daemon logs output to stderr when told" do
     fun = fn ->
-      {:ok, _pid} =
+      {:ok, pid} =
         start_supervised(
           daemon_spec(test_path("echo_stderr.test"), [],
             log_output: :error,
@@ -79,11 +80,29 @@ defmodule DaemonTest do
           )
         )
 
-      wait_for_close_check()
+      wait_for_output(pid, 15, 500)
       Logger.flush()
     end
 
     assert capture_log(fun) =~ "stderr message"
+  end
+
+  test "daemon does not log output to stderr when not told" do
+    fun = fn ->
+      {:ok, pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_stdio.test"), [],
+            log_output: :error,
+            stderr_to_stdout: false
+          )
+        )
+
+      wait_for_output(pid, 12, 500)
+
+      Logger.flush()
+    end
+
+    assert capture_log(fun) =~ "echo_stdio.test: stdout here\n"
   end
 
   test "daemon logs to a custom prefix" do
@@ -98,6 +117,26 @@ defmodule DaemonTest do
     end
 
     assert capture_log(fun) =~ "echo says: hello"
+  end
+
+  defp wait_for_output(_pid, count, time_left) when time_left <= 0 do
+    flunk("Didn't get #{count} output bytes from daemon process in time")
+  end
+
+  defp wait_for_output(pid, count, time_left) do
+    got = Daemon.statistics(pid).output_byte_count
+
+    cond do
+      got < count ->
+        Process.sleep(100)
+        wait_for_output(pid, count, time_left - 100)
+
+      got > count ->
+        flunk("Got too much output: #{got}, but expected #{count}")
+
+      true ->
+        :ok
+    end
   end
 
   test "can pass environment variables to the daemon" do

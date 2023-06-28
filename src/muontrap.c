@@ -40,6 +40,8 @@ static struct option long_options[] = {
     {"uid", required_argument, 0, 'u'},
     {"gid", required_argument, 0, 'a'},
     {"stdio-window", required_argument, 0, 'l'},
+    {"capture-output", no_argument, 0, 'o'},
+    {"capture-stderr", no_argument, 0, 'e'},
     {0,          0,                 0, 0 }
 };
 
@@ -73,6 +75,8 @@ static int stderr_pipe[2] = { -1, -1};
 #define DEFAULT_STDIO_WINDOW 10240 // Allow up to 10 KB out to Elixir at a time
 static int stdio_bytes_max = DEFAULT_STDIO_WINDOW;
 static int stdio_bytes_avail = DEFAULT_STDIO_WINDOW;
+static int capture_output = 0; // Don't capture output by default
+static int capture_stderr = 0; // If capturing output, don't capture stderr by default
 
 #define FOREACH_CONTROLLER for (struct controller_info *controller = controllers; controller != NULL; controller = controller->next)
 
@@ -89,7 +93,9 @@ static void usage()
     printf("--group,-g <cgroup path>\n");
     printf("--set,-s <cgroup variable>=<value>\n (may be specified multiple times)\n");
     printf("--delay-to-sigkill,-k <milliseconds>\n");
-    printf("--stdio-window,-l <bytes>\n");
+    printf("--stdio-window <bytes>\n");
+    printf("--capture-output\n");
+    printf("--capture-stderr\n");
     printf("--uid <uid/user> drop privilege to this uid or user\n");
     printf("--gid <gid/group> drop privilege to this gid or group\n");
     printf("-- the program to run and its arguments come after this\n");
@@ -144,11 +150,26 @@ static int fork_exec(const char *path, char *const *argv)
         // Move to the container
         move_pid_to_cgroups(getpid());
 
-        // Replace stdout and stderr with flow controlled versions
-        if (dup2(stdout_pipe[1], STDOUT_FILENO) < 0)
-            err(EXIT_FAILURE, "dup2 STDOUT_FILENO");
-        if (dup2(stderr_pipe[1], STDERR_FILENO) < 0)
-            err(EXIT_FAILURE, "dup2 STDERR_FILENO");
+        if (capture_output) {
+            // Replace stdout a with flow controlled versions
+            if (dup2(stdout_pipe[1], STDOUT_FILENO) < 0)
+                err(EXIT_FAILURE, "dup2 STDOUT_FILENO");
+
+            // If capturing stderr too, do the same thing.
+            if (capture_stderr) {
+                if (dup2(stderr_pipe[1], STDERR_FILENO) < 0)
+                    err(EXIT_FAILURE, "dup2 STDERR_FILENO");
+            }
+        } else {
+            // Not capturing stdout, so send it to /dev/null to get it dropped with as little processing as possible
+            int dev_null_fd = open("/dev/null", O_WRONLY);
+            if (dev_null_fd < 0)
+                err(EXIT_FAILURE, "Can't open /dev/null");
+
+            if (dup2(dev_null_fd, STDOUT_FILENO) < 0)
+                err(EXIT_FAILURE, "dup2 STDOUT_FILENO");
+            close(dev_null_fd);
+        }
 
         // Drop/change privilege if requested
         // See https://wiki.sei.cmu.edu/confluence/display/c/POS36-C.+Observe+correct+revocation+order+while+relinquishing+privileges
@@ -483,12 +504,12 @@ static void add_controller_setting(struct controller_info *controller, const cha
 }
 
 #if defined(__linux__)
-static void process_stdio(int from_fd, int to_fd) {
+static void process_stdio(int from_fd) {
     if (stdio_bytes_avail <= 0)
         return;
 
 retry:
-    ssize_t written = splice(from_fd, NULL, to_fd, NULL, stdio_bytes_avail, SPLICE_F_MOVE);
+    ssize_t written = splice(from_fd, NULL, STDOUT_FILENO, NULL, stdio_bytes_avail, SPLICE_F_MOVE);
     if (written < 0) {
         if (errno == EINTR)
             goto retry;
@@ -498,7 +519,7 @@ retry:
     stdio_bytes_avail -= written;
 }
 #else
-static void process_stdio(int from_fd, int to_fd) {
+static void process_stdio(int from_fd) {
     if (stdio_bytes_avail <= 0)
         return;
 
@@ -508,7 +529,7 @@ static void process_stdio(int from_fd, int to_fd) {
 
     if (got > 0) {
         for (ssize_t i = 0; i < got;) {
-            ssize_t written = write(to_fd, &buff[i], got - i);
+            ssize_t written = write(STDOUT_FILENO, &buff[i], got - i);
 
             if (written <= 0) {
                 if (errno == EINTR)
@@ -537,11 +558,14 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
     int poll_num = 2;
 
     for (;;) {
-        // Only poll for STDERR and STDOUT when accepting stdio data
-        if (stdio_bytes_avail > 0)
-            poll_num = 4;
-        else
-            poll_num = 2;
+        poll_num = 2;
+        // Also poll stdout and optionally stderr when capturing output and accepting stdio data
+        if (capture_output && stdio_bytes_avail > 0) {
+            poll_num++;
+
+            if (capture_stderr)
+                poll_num++;
+        }
 
         if (poll(fds, poll_num, -1) < 0) {
             if (errno == EINTR)
@@ -576,13 +600,11 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
                 errx(EXIT_FAILURE, "Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
         }
 
-        if (poll_num == 4) {
-            // If the stdio window was open, check for data to push to Elixir.
-            if (fds[2].revents)
-                process_stdio(fds[2].fd, STDOUT_FILENO);
-            if (fds[3].revents)
-                process_stdio(fds[3].fd, STDERR_FILENO);
-        }
+        if (poll_num > 2 && fds[2].revents)
+            process_stdio(fds[2].fd);
+
+        if (poll_num > 3 && fds[3].revents)
+            process_stdio(fds[3].fd);
 
         if (fds[1].revents) {
             int signal;
@@ -694,6 +716,14 @@ int main(int argc, char *argv[])
             stdio_bytes_avail = stdio_bytes_max;
             break;
 
+        case 'o': // --capture-output
+            capture_output = 1;
+            break;
+
+        case 'e': // --capture-stderr
+            capture_stderr = 1;
+            break;
+
         case 's':
         {
             if (!current_controller)
@@ -754,17 +784,21 @@ int main(int argc, char *argv[])
         fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
         warn("fcntl(FD_CLOEXEC)");
 
-    if (pipe(stdout_pipe) < 0)
-        err(EXIT_FAILURE, "pipe");
-    if (fcntl(stdout_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
-        fcntl(stdout_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
-        warn("fcntl(FD_CLOEXEC)");
+    if (capture_output) {
+        if (pipe(stdout_pipe) < 0)
+            err(EXIT_FAILURE, "pipe");
+        if (fcntl(stdout_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
+            fcntl(stdout_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
+            warn("fcntl(FD_CLOEXEC)");
 
-    if (pipe(stderr_pipe) < 0)
-        err(EXIT_FAILURE, "pipe");
-    if (fcntl(stderr_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
-        fcntl(stderr_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
-        warn("fcntl(FD_CLOEXEC)");
+        if (capture_stderr) {
+            if (pipe(stderr_pipe) < 0)
+                err(EXIT_FAILURE, "pipe");
+            if (fcntl(stderr_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
+                fcntl(stderr_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
+                warn("fcntl(FD_CLOEXEC)");
+        }
+    }
 
     enable_signal_handlers();
 

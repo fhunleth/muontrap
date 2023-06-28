@@ -55,7 +55,8 @@ defmodule MuonTrap.Daemon do
     :log_output,
     :log_prefix,
     :log_transform,
-    :exit_status_to_reason
+    :exit_status_to_reason,
+    :output_byte_count
   ]
 
   @spec child_spec(keyword()) :: Supervisor.child_spec()
@@ -112,6 +113,18 @@ defmodule MuonTrap.Daemon do
     GenServer.call(server, :os_pid)
   end
 
+  @doc """
+  Return statistics about the daemon
+
+  Statistics:
+
+  * `:output_byte_count` - bytes output by the process being run
+  """
+  @spec statistics(GenServer.server()) :: %{output_byte_count: non_neg_integer()}
+  def statistics(server) do
+    GenServer.call(server, :statistics)
+  end
+
   @impl GenServer
   def init([command, args, opts]) do
     options = MuonTrap.Options.validate(:daemon, command, args, opts)
@@ -129,7 +142,8 @@ defmodule MuonTrap.Daemon do
        log_prefix: Map.get(options, :log_prefix, command <> ": "),
        log_transform: Map.get(options, :log_transform, &Function.identity/1),
        exit_status_to_reason:
-         Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end)
+         Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end),
+       output_byte_count: 0
      }}
   end
 
@@ -160,18 +174,19 @@ defmodule MuonTrap.Daemon do
     {:reply, os_pid, state}
   end
 
-  @impl GenServer
-  def handle_info({_port, {:data, _}}, %__MODULE__{log_output: nil} = state) do
-    # Ignore output
-    {:noreply, state}
+  def handle_call(:statistics, _from, state) do
+    statistics = %{output_byte_count: state.output_byte_count}
+    {:reply, statistics, state}
   end
 
+  @impl GenServer
   def handle_info({port, {:data, message}}, %__MODULE__{port: port} = state) do
+    bytes_received = byte_size(message)
     state = split_and_log(message, state)
 
-    MuonTrap.Port.report_bytes_handled(state.port, byte_size(message))
+    MuonTrap.Port.report_bytes_handled(state.port, bytes_received)
 
-    {:noreply, state}
+    {:noreply, %{state | output_byte_count: state.output_byte_count + bytes_received}}
   end
 
   def handle_info({port, {:exit_status, status}}, %__MODULE__{port: port} = state) do
@@ -187,6 +202,10 @@ defmodule MuonTrap.Daemon do
       end
 
     {:stop, reason, state}
+  end
+
+  def handle_info(_message, state) do
+    {:noreply, state}
   end
 
   defp split_and_log(data, state) do

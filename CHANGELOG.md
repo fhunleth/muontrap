@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.3.0
+
+* New feature
+  * Add flow control to stdout (and stderr if capturing it) to prevent
+    out-of-memory VM crashes from programs that can spam stdout. The output
+    would accumulate in the process mailbox waiting to be processed. The flow
+    control implementation will push back and slow down output generation. The
+    number of bytes in flight defaults to 10 KB and is set with the new
+    `:stdio_window` parameter. (@jjcarstens)
+
+* Bug fixes
+  * Fix various minor issues preventing unit tests from passing on MacOS.
+    (@jjcarstens)
+
 ## v1.2.0
 
 * New feature

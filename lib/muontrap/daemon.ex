@@ -59,6 +59,8 @@ defmodule MuonTrap.Daemon do
     :output_byte_count
   ]
 
+  @max_data_to_buffer 256
+
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec([command, args]) do
     child_spec([command, args, []])
@@ -209,27 +211,33 @@ defmodule MuonTrap.Daemon do
   end
 
   defp split_and_log(data, state) do
-    do_split_and_log(state.buffer, data, state)
+    {lines, remainder} = process_data(state.buffer <> data)
+
+    Enum.each(lines, &log_line(&1, state))
+
+    %{state | buffer: remainder}
   end
 
-  defp do_split_and_log(leftovers, data, state) do
-    {line, remaining} = next_line(leftovers, data)
-
-    if line do
-      Logger.log(state.log_output, [state.log_prefix, state.log_transform.(line)])
-      do_split_and_log("", remaining, state)
-    else
-      %{state | buffer: remaining}
-    end
+  defp log_line(line, state) do
+    Logger.log(state.log_output, [state.log_prefix, state.log_transform.(line)])
   end
 
-  @spec next_line(String.t(), String.t()) :: {String.t() | nil, String.t()}
-  def next_line(leftovers, new_data) do
-    combined = leftovers <> new_data
-
-    case String.split(combined, "\n", parts: 2) do
-      [_] -> {nil, combined}
-      [line, remaining] -> {line, remaining}
-    end
+  @doc false
+  @spec process_data(binary()) :: {[String.t()], binary()}
+  def process_data(data) do
+    data |> String.split("\n") |> process_lines([])
   end
+
+  defp process_lines([leftovers], acc) do
+    {Enum.reverse(acc), trim_buffer(leftovers)}
+  end
+
+  defp process_lines([line | rest], acc) do
+    process_lines(rest, [line | acc])
+  end
+
+  defp trim_buffer(data) when byte_size(data) > @max_data_to_buffer,
+    do: :binary.part(data, 0, @max_data_to_buffer)
+
+  defp trim_buffer(data), do: data
 end

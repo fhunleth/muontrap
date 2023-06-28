@@ -341,15 +341,31 @@ defmodule DaemonTest do
     assert length(split) == 1001
   end
 
-  test "line splitting code" do
-    # Daemon.next_line(previous_leftovers, new_data) :: {line, leftovers}
-    assert {nil, "abcd"} == Daemon.next_line("", "abcd")
-    assert {"abcd", ""} == Daemon.next_line("", "abcd\n")
-    assert {"abcd", "\n"} == Daemon.next_line("", "abcd\n\n")
-    assert {"", "abcd"} == Daemon.next_line("\n", "abcd")
-    assert {"abcd", ""} == Daemon.next_line("ab", "cd\n")
-    assert {"a", "b\nc\nd\n"} == Daemon.next_line("a\nb\nc\n", "d\n")
-    assert {"a", "b\nc\nd\n"} == Daemon.next_line("a\n", "b\nc\nd\n")
-    assert {"a", "b\nc\nd\n"} == Daemon.next_line("a", "\nb\nc\nd\n")
+  test "line splits on newlines" do
+    # Daemon.process_data(data) :: {lines, leftovers}
+    assert {[], "abcd"} == Daemon.process_data("abcd")
+    assert {["abcd"], ""} == Daemon.process_data("abcd\n")
+    assert {["abcd", ""], ""} == Daemon.process_data("abcd\n\n")
+    assert {[""], "abcd"} == Daemon.process_data("\nabcd")
+    assert {["abcd"], ""} == Daemon.process_data("abcd\n")
+    assert {["a", "b", "c", "d"], ""} == Daemon.process_data("a\nb\nc\nd\n")
+  end
+
+  test "line splits trim max amount to buffer" do
+    a255 = :binary.copy("a", 255)
+    a256 = :binary.copy("a", 256)
+    a265 = :binary.copy("a", 265)
+
+    # Trims amount to buffer when no newlines
+    assert {[], a256} == Daemon.process_data(a265)
+
+    # Doesn't trim if not needed
+    assert {[], a255} == Daemon.process_data(a255)
+
+    # Doesn't trim full lines if complete
+    assert {[a265, "abcd"], "ef"} == Daemon.process_data(a265 <> "\nabcd\nef")
+
+    # Trims leftovers and returns lines
+    assert {["abc"], a256} == Daemon.process_data("abc\n" <> a265)
   end
 end

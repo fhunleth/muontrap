@@ -60,14 +60,15 @@ defmodule DaemonTest do
 
   test "daemon doesn't log output by default" do
     fun = fn ->
-      {:ok, _pid} = start_supervised(daemon_spec("echo", ["hello"], stderr_to_stdout: true))
+      {:ok, _pid} =
+        start_supervised(daemon_spec(test_path("echo_stdio.test"), [], stderr_to_stdout: true))
 
       wait_for_close_check()
 
       Logger.flush()
     end
 
-    refute capture_log(fun) =~ "hello"
+    assert capture_log(fun) == ""
   end
 
   test "daemon logs output to stderr when told" do

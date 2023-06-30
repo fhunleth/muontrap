@@ -168,6 +168,16 @@ static int fork_exec(const char *path, char *const *argv)
 
             if (dup2(dev_null_fd, STDOUT_FILENO) < 0)
                 err(EXIT_FAILURE, "dup2 STDOUT_FILENO");
+
+            // If not capturing output at all, but the user says to capture
+            // stderr, send stderr to /dev/null as well. As odd as this sounds
+            // here, it's due to the `:stderr_to_stdout` option mapping to
+            // `capture_stderr`.
+            if (capture_stderr) {
+                if (dup2(dev_null_fd, STDERR_FILENO) < 0)
+                    err(EXIT_FAILURE, "dup2 STDERR_FILENO");
+            }
+
             close(dev_null_fd);
         }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.1
+
+* Bug fixes
+  * Fix regression where stderr would be printed when `stderr_to_stdout: true`
+    was specified and logging disabled.
+
 ## v1.3.0
 
 * New feature

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.2
+
+* Bug fixes
+  * Fix C compiler error when building with older versions of gcc. This fixes an
+    compile error with Ubuntu 20.04, for example.
+
 ## v1.3.1
 
 * Bug fixes

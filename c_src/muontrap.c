@@ -514,12 +514,14 @@ static void add_controller_setting(struct controller_info *controller, const cha
 }
 
 #if defined(__linux__)
-static void process_stdio(int from_fd) {
+static void process_stdio(int from_fd)
+{
+    ssize_t written;
     if (stdio_bytes_avail <= 0)
         return;
 
 retry:
-    ssize_t written = splice(from_fd, NULL, STDOUT_FILENO, NULL, stdio_bytes_avail, SPLICE_F_MOVE);
+    written = splice(from_fd, NULL, STDOUT_FILENO, NULL, stdio_bytes_avail, SPLICE_F_MOVE);
     if (written < 0) {
         if (errno == EINTR)
             goto retry;
@@ -529,7 +531,8 @@ retry:
     stdio_bytes_avail -= written;
 }
 #else
-static void process_stdio(int from_fd) {
+static void process_stdio(int from_fd)
+{
     if (stdio_bytes_avail <= 0)
         return;
 

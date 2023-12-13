@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -22,13 +21,21 @@
 
 #ifdef DEBUG
 static FILE *debug_fp = NULL;
-#define INFO(MSG, ...) do { fprintf(debug_fp, "%d:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
+#define INFO(MSG, ...) do { fprintf(debug_fp, "%d INFO:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
+#define WARN(MSG, ...) do { fprintf(debug_fp, "%d WARN:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
+#define WARNX(MSG, ...) do { fprintf(debug_fp, "%d WARN:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
+#define ERROR(MSG, ...) do { fprintf(debug_fp, "%d  ERR:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); exit(EXIT_FAILURE); } while (0)
+#define ERRORX(MSG, ...) do { fprintf(debug_fp, "%d  ERR:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); exit(EXIT_FAILURE); } while (0)
 #else
 #define INFO(MSG, ...) ;
+#define WARN(MSG, ...) ;
+#define WARNX(MSG, ...) ;
+#define ERROR(MSG, ...) do { fprintf(stderr, "MUONTRAP: " MSG "\n",  ## __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
+#define ERRORX(MSG, ...) do { fprintf(stderr, "MUONTRAP: " MSG "\n",  ## __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
 #endif
 
 // asprintf can fail, but it's so rare that it's annoying to see the checks in the code.
-#define checked_asprintf(MSG, ...) do { if (asprintf(MSG, ## __VA_ARGS__) < 0) err(EXIT_FAILURE, "asprintf"); } while (0)
+#define checked_asprintf(MSG, ...) do { if (asprintf(MSG, ## __VA_ARGS__) < 0) ERROR("asprintf"); } while (0)
 
 static struct option long_options[] = {
     {"arg0", required_argument, 0, '0'},
@@ -112,7 +119,7 @@ void sigchild_handler(int signum)
 {
     if (signal_pipe[1] >= 0 &&
             write(signal_pipe[1], &signum, sizeof(signum)) < 0)
-        warn("write(signal_pipe)");
+        WARN("write(signal_pipe)");
 }
 
 void enable_signal_handlers()
@@ -153,21 +160,21 @@ static int fork_exec(const char *path, char *const *argv)
         if (capture_output) {
             // Replace stdout a with flow controlled versions
             if (dup2(stdout_pipe[1], STDOUT_FILENO) < 0)
-                err(EXIT_FAILURE, "dup2 STDOUT_FILENO");
+                ERROR("dup2 STDOUT_FILENO");
 
             // If capturing stderr too, do the same thing.
             if (capture_stderr) {
                 if (dup2(stderr_pipe[1], STDERR_FILENO) < 0)
-                    err(EXIT_FAILURE, "dup2 STDERR_FILENO");
+                    ERROR("dup2 STDERR_FILENO");
             }
         } else {
             // Not capturing stdout, so send it to /dev/null to get it dropped with as little processing as possible
             int dev_null_fd = open("/dev/null", O_WRONLY);
             if (dev_null_fd < 0)
-                err(EXIT_FAILURE, "Can't open /dev/null");
+                ERROR("Can't open /dev/null");
 
             if (dup2(dev_null_fd, STDOUT_FILENO) < 0)
-                err(EXIT_FAILURE, "dup2 STDOUT_FILENO");
+                ERROR("dup2 STDOUT_FILENO");
 
             // If not capturing output at all, but the user says to capture
             // stderr, send stderr to /dev/null as well. As odd as this sounds
@@ -175,7 +182,7 @@ static int fork_exec(const char *path, char *const *argv)
             // `capture_stderr`.
             if (capture_stderr) {
                 if (dup2(dev_null_fd, STDERR_FILENO) < 0)
-                    err(EXIT_FAILURE, "dup2 STDERR_FILENO");
+                    ERROR("dup2 STDERR_FILENO");
             }
 
             close(dev_null_fd);
@@ -184,10 +191,10 @@ static int fork_exec(const char *path, char *const *argv)
         // Drop/change privilege if requested
         // See https://wiki.sei.cmu.edu/confluence/display/c/POS36-C.+Observe+correct+revocation+order+while+relinquishing+privileges
         if (run_as_gid > 0 && setgid(run_as_gid) < 0)
-            err(EXIT_FAILURE, "setgid(%d)", run_as_gid);
+            ERROR("setgid(%d)", run_as_gid);
 
         if (run_as_uid > 0 && setuid(run_as_uid) < 0)
-            err(EXIT_FAILURE, "setuid(%d)", run_as_uid);
+            ERROR("setuid(%d)", run_as_uid);
 
         execvp(path, argv);
 
@@ -232,10 +239,10 @@ static void create_cgroups()
         INFO("Create cgroup: mkdir -p %s", controller->group_path);
         if (mkdir_p(controller->group_path, start_index) < 0) {
             if (errno == EEXIST)
-                errx(EXIT_FAILURE, "'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
+                ERRORX("'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
                      controller->group_path);
             else
-                err(EXIT_FAILURE, "Couldn't create '%s'. Check permissions.", controller->group_path);
+                ERROR("Couldn't create '%s'. Check permissions.", controller->group_path);
         }
     }
 }
@@ -260,7 +267,7 @@ static void update_cgroup_settings()
             char *setting_file;
             checked_asprintf(&setting_file, "%s/%s", controller->group_path, var->key);
             if (write_file(setting_file, var->value) < 0)
-                err(EXIT_FAILURE, "Error writing '%s' to '%s'", var->value, setting_file);
+                ERROR("Error writing '%s' to '%s'", var->value, setting_file);
             free(setting_file);
         }
     }
@@ -272,7 +279,7 @@ static void move_pid_to_cgroups(pid_t pid)
         FILE *fp = fopen(controller->procfile, "w");
         if (fp == NULL ||
             fprintf(fp, "%d", pid) < 0)
-            err(EXIT_FAILURE, "Can't add pid to %s", controller->procfile);
+            ERROR("Can't add pid to %s", controller->procfile);
         fclose(fp);
     }
 }
@@ -285,7 +292,7 @@ static void destroy_cgroups()
         INFO("rmdir %s", controller->group_path);
         if (rmdir(controller->group_path) < 0) {
             INFO("Error removing %s (%s)", controller->group_path, strerror(errno));
-            warn("Error removing %s", controller->group_path);
+            WARN("Error removing %s", controller->group_path);
         }
     }
 }
@@ -388,7 +395,7 @@ static int wait_for_sigchld(pid_t pid_to_match, int timeout_ms)
             if (errno == EINTR)
                 continue;
 
-            warn("poll");
+            WARN("poll");
             return -1;
         }
 
@@ -396,7 +403,7 @@ static int wait_for_sigchld(pid_t pid_to_match, int timeout_ms)
             int signal;
             ssize_t amt = read(signal_pipe[0], &signal, sizeof(signal));
             if (amt < 0) {
-                warn("read signal_pipe");
+                WARN("read signal_pipe");
                 return -1;
             }
 
@@ -419,7 +426,7 @@ static int wait_for_sigchld(pid_t pid_to_match, int timeout_ms)
                 return -1;
 
             default:
-                warnx("unexpected signal: %d", signal);
+                WARNX("unexpected signal: %d", signal);
                 return -1;
             }
         }
@@ -457,7 +464,7 @@ static void cleanup_all_children()
         } while (poll_intervals && children_left);
 
         if (children_left > 0) {
-            warnx("Failed to kill %d pids!", children_left);
+            WARNX("Failed to kill %d pids!", children_left);
 #ifdef DEBUG
             dump_all_children_from_cgroups();
 #endif
@@ -482,7 +489,7 @@ static void kill_child_nicely(pid_t child)
             return;
 
         if (wait_for_sigchld(child, brutal_kill_wait_ms) < 0)
-            warnx("SIGKILL didn't work on %d", child);
+            WARNX("SIGKILL didn't work on %d", child);
     }
 }
 
@@ -526,7 +533,7 @@ retry:
         if (errno == EINTR)
             goto retry;
 
-        err(EXIT_FAILURE, "failed to splice stdio (%d bytes)", stdio_bytes_avail);
+        ERROR("failed to splice stdio (%d bytes)", stdio_bytes_avail);
     }
     stdio_bytes_avail -= written;
 }
@@ -548,7 +555,7 @@ static void process_stdio(int from_fd)
                 if (errno == EINTR)
                     continue;
 
-                err(EXIT_FAILURE, "failed to copy stdio");
+                ERROR("failed to copy stdio");
             }
             stdio_bytes_avail -= written;
             i += written;
@@ -584,7 +591,7 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
             if (errno == EINTR)
                 continue;
 
-            warn("poll");
+            WARN("poll");
             return EXIT_FAILURE;
         }
 
@@ -610,7 +617,7 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
 
             stdio_bytes_avail += total_acks;
             if (stdio_bytes_avail > stdio_bytes_max)
-                errx(EXIT_FAILURE, "Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
+                ERRORX("Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
         }
 
         if (poll_num > 2 && fds[2].revents)
@@ -623,7 +630,7 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
             int signal;
             ssize_t amt = read(signal_pipe[0], &signal, sizeof(signal));
             if (amt < 0) {
-                warn("read signal_pipe");
+                WARN("read signal_pipe");
                 return EXIT_FAILURE;
             }
 
@@ -661,7 +668,7 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
                 return EXIT_FAILURE;
 
             default:
-                warnx("unexpected signal: %d", signal);
+                WARNX("unexpected signal: %d", signal);
                 return EXIT_FAILURE;
             }
         }
@@ -695,11 +702,11 @@ int main(int argc, char *argv[])
             if (*endptr != '\0') {
                 struct group *group = getgrnam(optarg);
                 if (!group)
-                    errx(EXIT_FAILURE, "Unknown group '%s'", optarg);
+                    ERRORX("Unknown group '%s'", optarg);
                 run_as_gid = group->gr_gid;
             }
             if (run_as_gid == 0)
-                errx(EXIT_FAILURE, "Setting the group to root or gid 0 is not allowed");
+                ERRORX("Setting the group to root or gid 0 is not allowed");
             break;
         }
 
@@ -709,7 +716,7 @@ int main(int argc, char *argv[])
 
         case 'g':
             if (cgroup_path)
-                errx(EXIT_FAILURE, "Only one cgroup group_path supported.");
+                ERRORX("Only one cgroup group_path supported.");
             cgroup_path = optarg;
             break;
 
@@ -740,11 +747,11 @@ int main(int argc, char *argv[])
         case 's':
         {
             if (!current_controller)
-                errx(EXIT_FAILURE, "Specify a cgroup controller (-c) before setting a variable");
+                ERRORX("Specify a cgroup controller (-c) before setting a variable");
 
             char *equalsign = strchr(optarg, '=');
             if (!equalsign)
-                errx(EXIT_FAILURE, "No '=' found when setting a variable: '%s'", optarg);
+                ERRORX("No '=' found when setting a variable: '%s'", optarg);
 
             // NULL terminate the key. We can do this since we're already modifying
             // the arguments by using getopt.
@@ -760,11 +767,11 @@ int main(int argc, char *argv[])
             if (*endptr != '\0') {
                 struct passwd *passwd = getpwnam(optarg);
                 if (!passwd)
-                    errx(EXIT_FAILURE, "Unknown user '%s'", optarg);
+                    ERRORX("Unknown user '%s'", optarg);
                 run_as_uid = passwd->pw_uid;
             }
             if (run_as_uid == 0)
-                errx(EXIT_FAILURE, "Setting the user to root or uid 0 is not allowed");
+                ERRORX("Setting the user to root or uid 0 is not allowed");
             break;
         }
 
@@ -779,37 +786,37 @@ int main(int argc, char *argv[])
     }
 
     if (argc == optind)
-        errx(EXIT_FAILURE, "Specify a program to run");
+        ERRORX("Specify a program to run");
 
     if (cgroup_path == NULL && controllers)
-        errx(EXIT_FAILURE, "Specify a cgroup group_path (-g)");
+        ERRORX("Specify a cgroup group_path (-g)");
 
     if (cgroup_path && !controllers)
-        errx(EXIT_FAILURE, "Specify a cgroup controller (-c) if you specify a group_path");
+        ERRORX("Specify a cgroup controller (-c) if you specify a group_path");
 
     finish_controller_init();
 
     // Finished processing commandline. Initialize and run child.
 
     if (pipe(signal_pipe) < 0)
-        err(EXIT_FAILURE, "pipe");
+        ERROR("pipe");
     if (fcntl(signal_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
         fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
-        warn("fcntl(FD_CLOEXEC)");
+        WARN("fcntl(FD_CLOEXEC)");
 
     if (capture_output) {
         if (pipe(stdout_pipe) < 0)
-            err(EXIT_FAILURE, "pipe");
+            ERROR("pipe");
         if (fcntl(stdout_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
             fcntl(stdout_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
-            warn("fcntl(FD_CLOEXEC)");
+            WARN("fcntl(FD_CLOEXEC)");
 
         if (capture_stderr) {
             if (pipe(stderr_pipe) < 0)
-                err(EXIT_FAILURE, "pipe");
+                ERROR("pipe");
             if (fcntl(stderr_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
                 fcntl(stderr_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
-                warn("fcntl(FD_CLOEXEC)");
+                WARN("fcntl(FD_CLOEXEC)");
         }
     }
 

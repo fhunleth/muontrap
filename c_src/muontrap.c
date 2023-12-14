@@ -525,11 +525,11 @@ static void add_controller_setting(struct controller_info *controller, const cha
 }
 
 #if defined(__linux__)
-static void process_stdio(int from_fd)
+static int process_stdio(int from_fd)
 {
     ssize_t written;
     if (stdio_bytes_avail <= 0)
-        return;
+        return 0;
 
 retry:
     written = splice(from_fd, NULL, STDOUT_FILENO, NULL, stdio_bytes_avail, SPLICE_F_MOVE);
@@ -537,15 +537,17 @@ retry:
         if (errno == EINTR)
             goto retry;
 
-        ERROR("failed to splice stdio (%d bytes)", stdio_bytes_avail);
+        WARN("failed to splice stdio (%d bytes)", stdio_bytes_avail);
+        return -1;
     }
     stdio_bytes_avail -= written;
+    return 0;
 }
 #else
-static void process_stdio(int from_fd)
+static int process_stdio(int from_fd)
 {
     if (stdio_bytes_avail <= 0)
-        return;
+        return 0;
 
     size_t max_to_read = stdio_bytes_avail > 4096 ? 4096 : stdio_bytes_avail;
     char buff[max_to_read];
@@ -559,12 +561,14 @@ static void process_stdio(int from_fd)
                 if (errno == EINTR)
                     continue;
 
-                ERROR("failed to copy stdio");
+                WARN("failed to copy stdio");
+                return -1;
             }
             stdio_bytes_avail -= written;
             i += written;
         }
     }
+    return 0;
 }
 #endif
 
@@ -620,15 +624,21 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
                 total_acks += acknowledgments[i];
 
             stdio_bytes_avail += total_acks;
-            if (stdio_bytes_avail > stdio_bytes_max)
-                ERRORX("Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
+            if (stdio_bytes_avail > stdio_bytes_max) {
+                WARNX("Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
+                return EXIT_FAILURE;
+            }
         }
 
-        if (poll_num > 2 && fds[2].revents)
-            process_stdio(fds[2].fd);
+        if (poll_num > 2 && fds[2].revents) {
+            if (process_stdio(fds[2].fd) < 0)
+                return EXIT_FAILURE;
+        }
 
-        if (poll_num > 3 && fds[3].revents)
-            process_stdio(fds[3].fd);
+        if (poll_num > 3 && fds[3].revents) {
+            if (process_stdio(fds[3].fd) < 0)
+                return EXIT_FAILURE;
+        }
 
         if (fds[1].revents) {
             int signal;

@@ -19,23 +19,27 @@
 #include <time.h>
 #include <unistd.h>
 
+// IMPORTANT:
+// The FATAL* macros mirror err(3) and errx(3) which also exit. Exiting does not clean up
+// the child process which defeats one of the reasons to use MuonTrap in the first place.
+// Be careful to use these macros in places where the child is not running.
 #ifdef DEBUG
 static FILE *debug_fp = NULL;
 #define INFO(MSG, ...) do { fprintf(debug_fp, "%d INFO:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
 #define WARN(MSG, ...) do { fprintf(debug_fp, "%d WARN:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
 #define WARNX(MSG, ...) do { fprintf(debug_fp, "%d WARN:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); } while (0)
-#define ERROR(MSG, ...) do { fprintf(debug_fp, "%d  ERR:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); exit(EXIT_FAILURE); } while (0)
-#define ERRORX(MSG, ...) do { fprintf(debug_fp, "%d  ERR:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); exit(EXIT_FAILURE); } while (0)
+#define FATAL(MSG, ...) do { fprintf(debug_fp, "%d  ERR:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); exit(EXIT_FAILURE); } while (0)
+#define FATALX(MSG, ...) do { fprintf(debug_fp, "%d  ERR:" MSG "\n", microsecs(), ## __VA_ARGS__); fflush(debug_fp); exit(EXIT_FAILURE); } while (0)
 #else
 #define INFO(MSG, ...) ;
 #define WARN(MSG, ...) ;
 #define WARNX(MSG, ...) ;
-#define ERROR(MSG, ...) do { fprintf(stderr, "MUONTRAP: " MSG "\n",  ## __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
-#define ERRORX(MSG, ...) do { fprintf(stderr, "MUONTRAP: " MSG "\n",  ## __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
+#define FATAL(MSG, ...) do { fprintf(stderr, "MUONTRAP: " MSG "\n",  ## __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
+#define FATALX(MSG, ...) do { fprintf(stderr, "MUONTRAP: " MSG "\n",  ## __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
 #endif
 
 // asprintf can fail, but it's so rare that it's annoying to see the checks in the code.
-#define checked_asprintf(MSG, ...) do { if (asprintf(MSG, ## __VA_ARGS__) < 0) ERROR("asprintf"); } while (0)
+#define checked_asprintf(MSG, ...) do { if (asprintf(MSG, ## __VA_ARGS__) < 0) FATAL("asprintf"); } while (0)
 
 static struct option long_options[] = {
     {"arg0", required_argument, 0, '0'},
@@ -160,21 +164,21 @@ static int fork_exec(const char *path, char *const *argv)
         if (capture_output) {
             // Replace stdout a with flow controlled versions
             if (dup2(stdout_pipe[1], STDOUT_FILENO) < 0)
-                ERROR("dup2 STDOUT_FILENO");
+                FATAL("dup2 STDOUT_FILENO");
 
             // If capturing stderr too, do the same thing.
             if (capture_stderr) {
                 if (dup2(stderr_pipe[1], STDERR_FILENO) < 0)
-                    ERROR("dup2 STDERR_FILENO");
+                    FATAL("dup2 STDERR_FILENO");
             }
         } else {
             // Not capturing stdout, so send it to /dev/null to get it dropped with as little processing as possible
             int dev_null_fd = open("/dev/null", O_WRONLY);
             if (dev_null_fd < 0)
-                ERROR("Can't open /dev/null");
+                FATAL("Can't open /dev/null");
 
             if (dup2(dev_null_fd, STDOUT_FILENO) < 0)
-                ERROR("dup2 STDOUT_FILENO");
+                FATAL("dup2 STDOUT_FILENO");
 
             // If not capturing output at all, but the user says to capture
             // stderr, send stderr to /dev/null as well. As odd as this sounds
@@ -182,7 +186,7 @@ static int fork_exec(const char *path, char *const *argv)
             // `capture_stderr`.
             if (capture_stderr) {
                 if (dup2(dev_null_fd, STDERR_FILENO) < 0)
-                    ERROR("dup2 STDERR_FILENO");
+                    FATAL("dup2 STDERR_FILENO");
             }
 
             close(dev_null_fd);
@@ -191,10 +195,10 @@ static int fork_exec(const char *path, char *const *argv)
         // Drop/change privilege if requested
         // See https://wiki.sei.cmu.edu/confluence/display/c/POS36-C.+Observe+correct+revocation+order+while+relinquishing+privileges
         if (run_as_gid > 0 && setgid(run_as_gid) < 0)
-            ERROR("setgid(%d)", run_as_gid);
+            FATAL("setgid(%d)", run_as_gid);
 
         if (run_as_uid > 0 && setuid(run_as_uid) < 0)
-            ERROR("setuid(%d)", run_as_uid);
+            FATAL("setuid(%d)", run_as_uid);
 
         execvp(path, argv);
 
@@ -239,10 +243,10 @@ static void create_cgroups()
         INFO("Create cgroup: mkdir -p %s", controller->group_path);
         if (mkdir_p(controller->group_path, start_index) < 0) {
             if (errno == EEXIST)
-                ERRORX("'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
+                FATALX("'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
                      controller->group_path);
             else
-                ERROR("Couldn't create '%s'. Check permissions.", controller->group_path);
+                FATAL("Couldn't create '%s'. Check permissions.", controller->group_path);
         }
     }
 }
@@ -267,7 +271,7 @@ static void update_cgroup_settings()
             char *setting_file;
             checked_asprintf(&setting_file, "%s/%s", controller->group_path, var->key);
             if (write_file(setting_file, var->value) < 0)
-                ERROR("Error writing '%s' to '%s'", var->value, setting_file);
+                FATAL("Error writing '%s' to '%s'", var->value, setting_file);
             free(setting_file);
         }
     }
@@ -279,7 +283,7 @@ static void move_pid_to_cgroups(pid_t pid)
         FILE *fp = fopen(controller->procfile, "w");
         if (fp == NULL ||
             fprintf(fp, "%d", pid) < 0)
-            ERROR("Can't add pid to %s", controller->procfile);
+            FATAL("Can't add pid to %s", controller->procfile);
         fclose(fp);
     }
 }
@@ -702,11 +706,11 @@ int main(int argc, char *argv[])
             if (*endptr != '\0') {
                 struct group *group = getgrnam(optarg);
                 if (!group)
-                    ERRORX("Unknown group '%s'", optarg);
+                    FATALX("Unknown group '%s'", optarg);
                 run_as_gid = group->gr_gid;
             }
             if (run_as_gid == 0)
-                ERRORX("Setting the group to root or gid 0 is not allowed");
+                FATALX("Setting the group to root or gid 0 is not allowed");
             break;
         }
 
@@ -716,7 +720,7 @@ int main(int argc, char *argv[])
 
         case 'g':
             if (cgroup_path)
-                ERRORX("Only one cgroup group_path supported.");
+                FATALX("Only one cgroup group_path supported.");
             cgroup_path = optarg;
             break;
 
@@ -747,11 +751,11 @@ int main(int argc, char *argv[])
         case 's':
         {
             if (!current_controller)
-                ERRORX("Specify a cgroup controller (-c) before setting a variable");
+                FATALX("Specify a cgroup controller (-c) before setting a variable");
 
             char *equalsign = strchr(optarg, '=');
             if (!equalsign)
-                ERRORX("No '=' found when setting a variable: '%s'", optarg);
+                FATALX("No '=' found when setting a variable: '%s'", optarg);
 
             // NULL terminate the key. We can do this since we're already modifying
             // the arguments by using getopt.
@@ -767,11 +771,11 @@ int main(int argc, char *argv[])
             if (*endptr != '\0') {
                 struct passwd *passwd = getpwnam(optarg);
                 if (!passwd)
-                    ERRORX("Unknown user '%s'", optarg);
+                    FATALX("Unknown user '%s'", optarg);
                 run_as_uid = passwd->pw_uid;
             }
             if (run_as_uid == 0)
-                ERRORX("Setting the user to root or uid 0 is not allowed");
+                FATALX("Setting the user to root or uid 0 is not allowed");
             break;
         }
 
@@ -786,34 +790,34 @@ int main(int argc, char *argv[])
     }
 
     if (argc == optind)
-        ERRORX("Specify a program to run");
+        FATALX("Specify a program to run");
 
     if (cgroup_path == NULL && controllers)
-        ERRORX("Specify a cgroup group_path (-g)");
+        FATALX("Specify a cgroup group_path (-g)");
 
     if (cgroup_path && !controllers)
-        ERRORX("Specify a cgroup controller (-c) if you specify a group_path");
+        FATALX("Specify a cgroup controller (-c) if you specify a group_path");
 
     finish_controller_init();
 
     // Finished processing commandline. Initialize and run child.
 
     if (pipe(signal_pipe) < 0)
-        ERROR("pipe");
+        FATAL("pipe");
     if (fcntl(signal_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
         fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
         WARN("fcntl(FD_CLOEXEC)");
 
     if (capture_output) {
         if (pipe(stdout_pipe) < 0)
-            ERROR("pipe");
+            FATAL("pipe");
         if (fcntl(stdout_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
             fcntl(stdout_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
             WARN("fcntl(FD_CLOEXEC)");
 
         if (capture_stderr) {
             if (pipe(stderr_pipe) < 0)
-                ERROR("pipe");
+                FATAL("pipe");
             if (fcntl(stderr_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
                 fcntl(stderr_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
                 WARN("fcntl(FD_CLOEXEC)");

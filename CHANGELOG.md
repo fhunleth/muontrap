@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.3.3
+
+* Bug fixes
+  * Fix issue where lots of prints from a child process when the Erlang process
+    side is killed can cause MuonTrap to not clean up the child process. There
+    are some potential variations on this that were also fixed even though they
+    were unseen. Thanks to @bjyoungblood for figuring this out.
+
+* Improvements
+  * Improve debug logging so that when enabled, fatal errors are written to the
+    log as well and not to stderr.
+
 ## v1.3.2
 
 * Bug fixes

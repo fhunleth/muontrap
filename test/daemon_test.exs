@@ -28,6 +28,57 @@ defmodule DaemonTest do
     assert_os_pid_exited(os_pid)
   end
 
+  test "stopping the daemon kill very chatty processes" do
+    fun = fn ->
+      # Try up to 5 times to avoid false negatives. If the error is present, the
+      # test will nearly always fail on the first iteration.
+      for _ <- 1..5 do
+        {:ok, pid} =
+          start_supervised(daemon_spec(test_path("chatty.test"), [], log_output: :debug))
+
+        os_pid = Daemon.os_pid(pid)
+        assert_os_pid_running(os_pid)
+
+        child_pid = find_child_pid(os_pid)
+        assert is_integer(child_pid)
+
+        :ok = stop_supervised(:test_daemon)
+
+        wait_for_close_check()
+        assert_os_pid_exited(os_pid)
+
+        if is_os_pid_around?(child_pid) do
+          System.cmd("kill", ["-9", "#{child_pid}"])
+          flunk("muontrap process exited but child process was still running")
+        end
+      end
+    end
+
+    # For this test, it's critical to capture the log output even though we don't
+    # use it; not doing so significantly increases the likelihood of false
+    # negatives.
+    capture_log([level: :info], fun)
+  end
+
+  @spec find_child_pid(non_neg_integer()) :: non_neg_integer() | nil
+  def find_child_pid(os_pid) do
+    {output, _} = System.cmd("ps", ["-eo", "ppid,pid"])
+
+    output
+    |> String.split("\n")
+    |> Enum.find_value(fn line ->
+      parsed_line = line |> String.trim() |> String.split(~r/\s+/)
+
+      with [ppid, pid] <- parsed_line,
+           true <- ppid == to_string(os_pid),
+           {pid, ""} <- Integer.parse(pid) do
+        pid
+      else
+        _ -> nil
+      end
+    end)
+  end
+
   test "daemon logs output when told" do
     fun = fn ->
       {:ok, _pid} = start_supervised(daemon_spec("echo", ["hello"], log_output: :error))

@@ -60,6 +60,10 @@ defmodule MuonTrap do
     * `:delay_to_sigkill` - milliseconds before sending a SIGKILL to a child process if it doesn't exit with a SIGTERM (default 500 ms)
     * `:uid` - run the command using the specified uid or username
     * `:gid` - run the command using the specified gid or group
+    * `:timeout` - milliseconds to wait for the command to complete. If the
+      command does not exit before the timeout, the return value will contain
+      the output up to that point and `:timeout` as the exit status. The child
+      process will be sent SIGTERM
 
   The following `System.cmd/3` options are also available:
 
@@ -96,9 +100,14 @@ defmodule MuonTrap do
   iex-donttest> MuonTrap.cmd("echo", ["hello"], cgroup_controllers: ["memory"], cgroup_path: "muontrap/test", cgroup_sets: [{"memory", "memory.limit_in_bytes", "8192"}])
   {"", 1}
   ```
+
+  Run a command with a timeout:
+
+  iex> MuonTrap.cmd("/bin/sh", ["-c", "echo start && sleep 10 && echo end"], timeout: 100)
+  {"start\n", :timeout}
   """
   @spec cmd(binary(), [binary()], keyword()) ::
-          {Collectable.t(), exit_status :: non_neg_integer()}
+          {Collectable.t(), exit_status :: non_neg_integer() | :timeout}
   def cmd(command, args, opts \\ []) when is_binary(command) and is_list(args) do
     options = MuonTrap.Options.validate(:cmd, command, args, opts)
 

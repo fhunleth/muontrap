@@ -119,6 +119,42 @@ defmodule MuonTrapTest do
     assert length(split) == 1001
   end
 
+  test "cmd/3 with timeout" do
+    opts = [timeout: 250]
+
+    fun = fn ->
+      MuonTrap.cmd(test_path("chatty.test"), [], opts)
+    end
+
+    assert {elapsed, {output, :timeout}} = :timer.tc(fun)
+    elapsed = div(elapsed, 1000)
+
+    assert_in_delta opts[:timeout], elapsed, 50
+    assert byte_size(output) > 0
+  end
+
+  test "cmd/3 with timeout cleans up timers" do
+    opts = [timeout: 100]
+
+    {_, status} = MuonTrap.cmd(test_path("kill_self_with_signal.test"), [], opts)
+
+    refute status == :timeout
+    refute_receive :timeout
+  end
+
+  test "cmd/3 doesn't eat any messages sent to the process" do
+    opts = [timeout: 250]
+
+    message = {:timeout, make_ref()}
+    Process.send_after(self(), message, 10)
+    Process.send_after(self(), :foo, 10)
+
+    assert {_, :timeout} = MuonTrap.cmd(test_path("do_nothing.test"), [], opts)
+
+    assert_receive ^message
+    assert_receive :foo
+  end
+
   # Test adapted from https://github.com/elixir-lang/elixir/blob/v1.15.0/lib/elixir/test/elixir/system_test.exs#L121
   @echo "echo-elixir-test"
   @tag :tmp_dir

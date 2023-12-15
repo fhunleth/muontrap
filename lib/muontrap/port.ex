@@ -16,30 +16,39 @@ defmodule MuonTrap.Port do
   This code is mostly copy/pasted from System.cmd/3's implementation so that
   it works similarly.
   """
-  @spec cmd(MuonTrap.Options.t()) :: {Collectable.t(), exit_status :: non_neg_integer()}
+  @spec cmd(MuonTrap.Options.t()) ::
+          {Collectable.t(), exit_status :: non_neg_integer() | :timeout}
   def cmd(options) do
     opts = port_options(options, ["--capture-output"])
     {initial, fun} = Collectable.into(options.into)
+    {maybe_timer, timeout_message} = maybe_start_timer(options[:timeout])
 
     try do
-      do_cmd(Port.open({:spawn_executable, to_charlist(muontrap_path())}, opts), initial, fun)
+      port = Port.open({:spawn_executable, to_charlist(muontrap_path())}, opts)
+      do_cmd(port, initial, fun, timeout_message)
     catch
       kind, reason ->
         fun.(initial, :halt)
         :erlang.raise(kind, reason, __STACKTRACE__)
     else
       {acc, status} -> {fun.(acc, :done), status}
+    after
+      maybe_stop_timer(maybe_timer, timeout_message)
     end
   end
 
-  defp do_cmd(port, acc, fun) do
+  defp do_cmd(port, acc, fun, timeout_message) do
     receive do
       {^port, {:data, data}} ->
         report_bytes_handled(port, byte_size(data))
-        do_cmd(port, fun.(acc, {:cont, data}), fun)
+        do_cmd(port, fun.(acc, {:cont, data}), fun, timeout_message)
 
       {^port, {:exit_status, status}} ->
         {acc, status}
+
+      ^timeout_message ->
+        Port.close(port)
+        {acc, :timeout}
     end
   end
 
@@ -112,4 +121,32 @@ defmodule MuonTrap.Port do
 
   defp encode_acks_helper(full_acks, partial_acks),
     do: [:binary.copy(<<255>>, full_acks), partial_acks - 1]
+
+  @spec maybe_start_timer(non_neg_integer() | nil) :: {reference() | nil, {:timeout, reference()}}
+  defp maybe_start_timer(timeout) when is_integer(timeout) do
+    timeout_message = {:timeout, make_ref()}
+    timer_ref = Process.send_after(self(), timeout_message, timeout)
+    {timer_ref, timeout_message}
+  end
+
+  # When not setting a timer, return a fake message. This simplifies pattern
+  # matching in cmd/1 and do_cmd/4.
+  defp maybe_start_timer(_), do: {nil, {:timeout, make_ref()}}
+
+  @spec maybe_stop_timer(reference() | nil, {:timeout, reference()}) :: :ok
+  defp maybe_stop_timer(nil, _), do: :ok
+
+  defp maybe_stop_timer(timer_ref, timeout_message) do
+    # Ensure we capture the timeout message in case it arrives around the same
+    # time the command completes.
+    if Process.cancel_timer(timer_ref) == false do
+      receive do
+        ^timeout_message -> :ok
+      after
+        0 -> :ok
+      end
+    end
+
+    :ok
+  end
 end

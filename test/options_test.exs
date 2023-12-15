@@ -39,6 +39,7 @@ defmodule MuonTrap.OptionsTest do
   test "cmd and daemon-specific options" do
     # :cmd-only
     assert Map.get(Options.validate(:cmd, "echo", [], into: ""), :into) == ""
+    assert Map.get(Options.validate(:cmd, "echo", [], timeout: 1000), :timeout) == 1000
 
     assert_raise ArgumentError, fn ->
       Options.validate(:daemon, "echo", [], into: "")
@@ -62,6 +63,10 @@ defmodule MuonTrap.OptionsTest do
 
     assert_raise ArgumentError, fn ->
       Options.validate(:daemon, "echo", [], log_output: :bad_level)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:daemon, "echo", [], timeout: 1000)
     end
   end
 

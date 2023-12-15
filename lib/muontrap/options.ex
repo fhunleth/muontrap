@@ -38,6 +38,7 @@ defmodule MuonTrap.Options do
   * `:cgroup_sets`
   * `:uid`
   * `:gid`
+  * `:timeout` - `MuonTrap.cmd/3` only
 
   """
   @type t() :: map()
@@ -147,6 +148,9 @@ defmodule MuonTrap.Options do
 
   defp validate_option(_any, {:gid, id}, opts) when is_integer(id) or is_binary(id),
     do: Map.put(opts, :gid, id)
+
+  defp validate_option(:cmd, {:timeout, timeout}, opts) when is_integer(timeout) and timeout > 0,
+    do: Map.put(opts, :timeout, timeout)
 
   defp validate_option(_any, {key, val}, _opts),
     do: raise(ArgumentError, "invalid option #{inspect(key)} with value #{inspect(val)}")

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.4.0
+
+* New feature
+  * Add a timeout option to `MuonTrap.cmd/3`. OS processes that take too long
+    will be killed and a `:timeout` return status returned. This is backwards
+    compatible. Thanks to @bjyoungblood for adding this feature.
+
 ## v1.3.3
 
 * Bug fixes

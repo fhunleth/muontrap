@@ -5,6 +5,7 @@
 defmodule DaemonTest do
   use MuonTrapTest.Case
   import ExUnit.CaptureLog
+  import ExUnit.CaptureIO
 
   alias MuonTrap.Daemon
 
@@ -419,5 +420,25 @@ defmodule DaemonTest do
 
     # Trims leftovers and returns lines
     assert {["abc"], a256} == Daemon.process_data("abc\n" <> a265)
+  end
+
+  test "daemon inspects non-utf8 strings" do
+    output =
+      capture_io(:user, fn ->
+        {:ok, pid} =
+          start_supervised(daemon_spec(test_path("echo_junk.test"), [], log_output: :error))
+
+        wait_for_output(pid, 15, 500)
+        Logger.flush()
+      end)
+
+    refute output =~ "FORMATTER ERROR: bad return value"
+    refute output =~ "** (RuntimeError) bad return value from Logger formatter Logger.Formatter"
+
+    if Version.match?(System.version(), ">= 1.16.0") do
+      assert output =~ "��ti�g!c"
+    else
+      assert output =~ "** MuonTrap filtered 14 non-UTF8 bytes **"
+    end
   end
 end

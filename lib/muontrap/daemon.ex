@@ -28,6 +28,9 @@ defmodule MuonTrap.Daemon do
     Specify the log level (e.g., `:debug`)
   * `:log_prefix` - Prefix each log message with this string (defaults to the
     program's path)
+  * `:log_transform` - Pass a function that takes a string and returns a string
+    to format output from the command. Defaults to `String.replace_invalid/1`
+    on Elixir 1.16+ to avoid crashing the logger on non-UTF8 output.
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout.
     Defaults to `false`.
   * `:exit_status_to_reason` - Optional function to convert the exit status (a
@@ -142,11 +145,25 @@ defmodule MuonTrap.Daemon do
        cgroup_path: Map.get(options, :cgroup_path),
        log_output: Map.get(options, :log_output),
        log_prefix: Map.get(options, :log_prefix, command <> ": "),
-       log_transform: Map.get(options, :log_transform, &Function.identity/1),
+       log_transform: Map.get(options, :log_transform, &default_transform/1),
        exit_status_to_reason:
          Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end),
        output_byte_count: 0
      }}
+  end
+
+  if Version.match?(System.version(), ">= 1.16.0") do
+    defp default_transform(line) do
+      String.replace_invalid(line)
+    end
+  else
+    defp default_transform(line) do
+      if String.valid?(line) do
+        line
+      else
+        "** MuonTrap filtered #{byte_size(line)} non-UTF8 bytes **"
+      end
+    end
   end
 
   @impl GenServer

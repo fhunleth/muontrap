@@ -47,7 +47,7 @@ defmodule DaemonTest do
         wait_for_close_check()
         assert_os_pid_exited(os_pid)
 
-        if is_os_pid_around?(child_pid) do
+        if os_pid_around?(child_pid) do
           System.cmd("kill", ["-9", "#{child_pid}"])
           flunk("muontrap process exited but child process was still running")
         end

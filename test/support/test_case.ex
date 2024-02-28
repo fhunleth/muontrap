@@ -37,21 +37,21 @@ defmodule MuonTrapTest.Case do
     "muontrap_test/test#{:rand.uniform(10000)}"
   end
 
-  @spec is_os_pid_around?(non_neg_integer()) :: boolean
-  def is_os_pid_around?(os_pid) do
+  @spec os_pid_around?(non_neg_integer()) :: boolean
+  def os_pid_around?(os_pid) do
     {_, rc} = System.cmd("ps", ["-p", "#{os_pid}"])
     rc == 0
   end
 
   @spec assert_os_pid_running(non_neg_integer()) :: :ok
   def assert_os_pid_running(os_pid) do
-    is_os_pid_around?(os_pid) || flunk("Expected OS pid #{os_pid} to still be running")
+    os_pid_around?(os_pid) || flunk("Expected OS pid #{os_pid} to still be running")
     :ok
   end
 
   @spec assert_os_pid_exited(non_neg_integer()) :: :ok
   def assert_os_pid_exited(os_pid) do
-    is_os_pid_around?(os_pid) && flunk("Expected OS pid #{os_pid} to be killed")
+    os_pid_around?(os_pid) && flunk("Expected OS pid #{os_pid} to be killed")
     :ok
   end
 

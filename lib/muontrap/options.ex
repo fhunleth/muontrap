@@ -43,6 +43,10 @@ defmodule MuonTrap.Options do
   """
   @type t() :: map()
 
+  # See https://hexdocs.pm/logger/Logger.html#module-levels
+  # Include `:warn` for older Elixir versions
+  @log_levels [:emergency, :alert, :critical, :error, :warning, :warn, :notice, :info, :debug]
+
   @doc """
   Validate options and normalize them for invoking commands
 
@@ -107,9 +111,8 @@ defmodule MuonTrap.Options do
   defp validate_option(:daemon, {:name, name}, opts),
     do: Map.put(opts, :name, name)
 
-  defp validate_option(:daemon, {:log_output, level}, opts)
-       when level in [:error, :warn, :info, :debug],
-       do: Map.put(opts, :log_output, level)
+  defp validate_option(:daemon, {:log_output, level}, opts) when level in @log_levels,
+    do: Map.put(opts, :log_output, level)
 
   defp validate_option(:daemon, {:log_prefix, prefix}, opts) when is_binary(prefix),
     do: Map.put(opts, :log_prefix, prefix)

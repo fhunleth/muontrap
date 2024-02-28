@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.4.1
+
+* Bug fixes
+  * Support logging output to all Elixir logger levels. Previously the "new" set
+    that includes emergency, critical, warning, etc. would fail the option check
+  * Default the `log_transform` option to replace invalid UTF8 characters so
+    they don't crash the Logger. This fixes an annoyance where a program would
+    do this and there'd be log crash spam. It's still overridable, so users
+    using custom loggers that already handle this can pass
+    `Function.identity/1` to disable. (@jjcarstens)
+
 ## v1.4.0
 
 * New feature

@@ -31,6 +31,9 @@ defmodule MuonTrap.Daemon do
   * `:log_transform` - Pass a function that takes a string and returns a string
     to format output from the command. Defaults to `String.replace_invalid/1`
     on Elixir 1.16+ to avoid crashing the logger on non-UTF8 output.
+  * `:logger_metadata` - A keyword list to merge into the process's logger metadata.
+    The `:muontrap_cmd` and `:muontrap_args` keys are automatically added and
+    cannot be overridden.
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout.
     Defaults to `false`.
   * `:exit_status_to_reason` - Optional function to convert the exit status (a
@@ -136,6 +139,11 @@ defmodule MuonTrap.Daemon do
     port_options = MuonTrap.Port.port_options(options) ++ [:stream]
 
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
+
+    options
+    |> Map.get(:logger_metadata, [])
+    |> Keyword.merge(muontrap_cmd: command, muontrap_args: Enum.join(args, " "))
+    |> Logger.metadata()
 
     {:ok,
      %__MODULE__{

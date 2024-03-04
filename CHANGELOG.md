@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.5.0
+
+* New feature
+  * Add Logger metadata in `MuonTrap.Daemon`. See the `:logger_metadata` option.
+    (@bjyoungblood)
+
 ## v1.4.1
 
 * Bug fixes

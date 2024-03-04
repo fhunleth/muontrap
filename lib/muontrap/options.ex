@@ -29,6 +29,7 @@ defmodule MuonTrap.Options do
   * `:log_output` - `MuonTrap.Daemon`-only
   * `:log_prefix` - `MuonTrap.Daemon`-only
   * `:log_transform` - `MuonTrap.Daemon`-only
+  * `:logger_metadata` - `MuonTrap.Daemon`-only
   * `:stdio_window`
   * `:exit_status_to_reason` - `MuonTrap.Daemon`-only
   * `:cgroup_controllers`
@@ -120,6 +121,9 @@ defmodule MuonTrap.Options do
   defp validate_option(:daemon, {:log_transform, log_transform}, opts)
        when is_function(log_transform),
        do: Map.put(opts, :log_transform, log_transform)
+
+  defp validate_option(:daemon, {:logger_metadata, metadata}, opts) when is_list(metadata),
+    do: Map.put(opts, :logger_metadata, metadata)
 
   defp validate_option(_any, {:stdio_window, count}, opts) when is_integer(count),
     do: Map.put(opts, :stdio_window, count)

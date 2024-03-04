@@ -68,6 +68,15 @@ defmodule MuonTrap.OptionsTest do
     assert_raise ArgumentError, fn ->
       Options.validate(:daemon, "echo", [], timeout: 1000)
     end
+
+    assert Map.get(
+             Options.validate(:daemon, "echo", [], logger_metadata: [foo: :bar]),
+             :logger_metadata
+           ) == [foo: :bar]
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:cmd, "echo", [], logger_metadata: [foo: :bar])
+    end
   end
 
   test "common commands basically work" do

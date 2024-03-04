@@ -172,6 +172,33 @@ defmodule DaemonTest do
     assert capture_log(fun) =~ "echo says: hello"
   end
 
+  test "daemon logs include metadata" do
+    fun = fn ->
+      {:ok, _pid} =
+        start_supervised(
+          daemon_spec(
+            "echo",
+            ["-n", "hello"],
+            log_output: :error,
+            logger_metadata: [foo: :bar]
+          )
+        )
+
+      wait_for_close_check()
+      Logger.flush()
+    end
+
+    logger_opts = [
+      metadata: [:foo, :muontrap_cmd, :muontrap_args],
+      format: "[$level] $message $metadata\n"
+    ]
+
+    log_output = capture_log(logger_opts, fun)
+    assert log_output =~ "foo=bar"
+    assert log_output =~ "muontrap_cmd=echo"
+    assert log_output =~ "muontrap_args=-n hello"
+  end
+
   defp wait_for_output(_pid, count, time_left) when time_left <= 0 do
     flunk("Didn't get #{count} output bytes from daemon process in time")
   end

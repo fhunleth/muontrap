@@ -10,7 +10,7 @@ defmodule MuonTrap.Daemon do
 
   ```elixir
   children = [
-    {MuonTrap.Daemon, ["my_server", ["--options", "foo"]], [cd: "/some_directory"]]}
+    {MuonTrap.Daemon, ["my_server", ["--options", "foo"], [cd: "/some_directory"]]}
   ]
 
   opts = [strategy: :one_for_one, name: MyApplication.Supervisor]

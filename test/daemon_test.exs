@@ -199,6 +199,85 @@ defmodule DaemonTest do
     assert log_output =~ "muontrap_args=-n hello"
   end
 
+  test "daemon supports custom logger (captured function)" do
+    test_process = self()
+
+    logger = fn line ->
+      send(test_process, line)
+    end
+
+    fun = fn ->
+      {:ok, pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_stdio.test"), [],
+            log_output: :error,
+            custom_logger: logger,
+            stderr_to_stdout: false
+          )
+        )
+
+      wait_for_output(pid, 12, 500)
+
+      Logger.flush()
+    end
+
+    log_output = capture_log(fun)
+
+    refute log_output =~ "stdout here"
+
+    assert_receive "stdout here", 500
+    refute_receive _
+  end
+
+  test "daemon supports custom logger (mfa)" do
+    fun = fn ->
+      {:ok, pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_stdio.test"), [],
+            log_output: :error,
+            custom_logger: {__MODULE__, :custom_logger_fun},
+            stderr_to_stdout: false
+          )
+        )
+
+      wait_for_output(pid, 12, 500)
+
+      Logger.flush()
+    end
+
+    log_output = capture_log(fun)
+
+    assert log_output =~ "stdout here"
+    refute log_output =~ "custom_logger"
+
+    stop_supervised(:test_daemon)
+
+    fun = fn ->
+      {:ok, pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_stdio.test"), [],
+            log_output: :error,
+            custom_logger: {__MODULE__, :custom_logger_fun, ["custom_logger: "]},
+            stderr_to_stdout: false
+          )
+        )
+
+      wait_for_output(pid, 12, 500)
+
+      Logger.flush()
+    end
+
+    log_output = capture_log(fun)
+
+    assert log_output =~ "custom_logger: stdout here"
+  end
+
+  @spec custom_logger_fun(binary(), binary()) :: :ok
+  def custom_logger_fun(line, prefix \\ "") do
+    require Logger
+    Logger.info([prefix, line])
+  end
+
   defp wait_for_output(_pid, count, time_left) when time_left <= 0 do
     flunk("Didn't get #{count} output bytes from daemon process in time")
   end

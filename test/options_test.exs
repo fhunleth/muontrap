@@ -77,6 +77,33 @@ defmodule MuonTrap.OptionsTest do
     assert_raise ArgumentError, fn ->
       Options.validate(:cmd, "echo", [], logger_metadata: [foo: :bar])
     end
+
+    assert is_function(
+             Map.get(
+               Options.validate(:daemon, "echo", [], custom_logger: &Function.identity/1),
+               :custom_logger
+             )
+           )
+
+    assert {Function, :identity, []} =
+             Map.get(
+               Options.validate(:daemon, "echo", [], custom_logger: {Function, :identity, []}),
+               :custom_logger
+             )
+
+    assert {Function, :identity, []} =
+             Map.get(
+               Options.validate(:daemon, "echo", [], custom_logger: {Function, :identity}),
+               :custom_logger
+             )
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:daemon, "echo", [], custom_logger: &DateTime.add/2)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:cmd, "echo", [], custom_logger: &Function.identity/1)
+    end
   end
 
   test "common commands basically work" do

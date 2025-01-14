@@ -26,10 +26,11 @@ defmodule MuonTrap.Options do
   * `:parallelism`
   * `:env`
   * `:name` - `MuonTrap.Daemon`-only
-  * `:log_output` - `MuonTrap.Daemon`-only
-  * `:log_prefix` - `MuonTrap.Daemon`-only
-  * `:log_transform` - `MuonTrap.Daemon`-only
-  * `:logger_metadata` - `MuonTrap.Daemon`-only
+  * `:custom_logger` - `MuonTrap.Daemon`-only
+  * `:log_output` - `MuonTrap.Daemon`-only, ignored if custom_logger is set
+  * `:log_prefix` - `MuonTrap.Daemon`-only, ignored if custom_logger is set
+  * `:log_transform` - `MuonTrap.Daemon`-only, ignored if custom_logger is set
+  * `:logger_metadata` - `MuonTrap.Daemon`-only, ignored if custom_logger is set
   * `:stdio_window`
   * `:exit_status_to_reason` - `MuonTrap.Daemon`-only
   * `:cgroup_controllers`
@@ -124,6 +125,24 @@ defmodule MuonTrap.Options do
 
   defp validate_option(:daemon, {:logger_metadata, metadata}, opts) when is_list(metadata),
     do: Map.put(opts, :logger_metadata, metadata)
+
+  defp validate_option(:daemon, {:custom_logger, logger}, opts) when is_function(logger, 1),
+    do: Map.put(opts, :custom_logger, logger)
+
+  defp validate_option(:daemon, {:custom_logger, {m, f, a}}, opts)
+       when is_atom(m) and is_atom(f) and is_list(a),
+       do: Map.put(opts, :custom_logger, {m, f, a})
+
+  defp validate_option(:daemon, {:custom_logger, {m, f}}, opts)
+       when is_atom(m) and is_atom(f),
+       do: Map.put(opts, :custom_logger, {m, f, []})
+
+  defp validate_option(:daemon, {:custom_logger, v}, _opts),
+    do:
+      raise(
+        ArgumentError,
+        "invalid option :custom_logger with value #{inspect(v)}, expected a 1-arity function or an mfa tuple"
+      )
 
   defp validate_option(_any, {:stdio_window, count}, opts) when is_integer(count),
     do: Map.put(opts, :stdio_window, count)

@@ -24,6 +24,9 @@ defmodule MuonTrap.Daemon do
   the following additions:
 
   * `:name` - Name the Daemon GenServer
+  * `:custom_logger` - Pass a 1-arity function or `t:mfa/0` to replace the default
+    logging behavior. When set, `:log_output`, `:log_prefix`, `:log_transform`,
+    and `:logger_metadata` will be ignored.
   * `:log_output` - When set, send output from the command to the Logger.
     Specify the log level (e.g., `:debug`)
   * `:log_prefix` - Prefix each log message with this string (defaults to the
@@ -58,6 +61,7 @@ defmodule MuonTrap.Daemon do
     :command,
     :port,
     :cgroup_path,
+    :custom_logger,
     :log_output,
     :log_prefix,
     :log_transform,
@@ -151,6 +155,7 @@ defmodule MuonTrap.Daemon do
        command: command,
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
+       custom_logger: Map.get(options, :custom_logger),
        log_output: Map.get(options, :log_output),
        log_prefix: Map.get(options, :log_prefix, command <> ": "),
        log_transform: Map.get(options, :log_transform, &default_transform/1),
@@ -244,6 +249,14 @@ defmodule MuonTrap.Daemon do
   end
 
   defp log_line(line, state) do
+    case state.custom_logger do
+      logger when is_function(logger, 1) -> logger.(line)
+      {m, f, a} when is_atom(m) and is_atom(f) -> apply(m, f, [line | a])
+      nil -> default_log_line(line, state)
+    end
+  end
+
+  defp default_log_line(line, state) do
     Logger.log(state.log_output, [state.log_prefix, state.log_transform.(line)])
   end
 

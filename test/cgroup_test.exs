@@ -74,7 +74,7 @@ defmodule CgroupTest do
     assert memory_cgroup_exists(cgroup_path)
 
     {:ok, memory_str} = Cgroups.cgget("memory", cgroup_path, "memory.limit_in_bytes")
-    memory = Integer.parse(memory_str)
+    {memory, _} = Integer.parse(memory_str)
     assert memory > 1000
 
     # :ok = Cgroups.cgset("memory", cgroup_path, "memory.limit_in_bytes", "900")

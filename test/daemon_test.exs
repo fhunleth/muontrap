@@ -394,7 +394,7 @@ defmodule DaemonTest do
     assert_os_pid_running(os_pid)
 
     {:ok, memory_str} = Daemon.cgget(pid, "memory", "memory.limit_in_bytes")
-    memory = Integer.parse(memory_str)
+    {memory, _} = Integer.parse(memory_str)
     assert memory > 1000
   end
 

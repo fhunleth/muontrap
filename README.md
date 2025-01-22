@@ -66,9 +66,32 @@ should no longer be running (like if something else crashed in Elixir and
 supervision needs to clean up) then MuonTrap will kill `"long_running_command"`
 and all of its children.
 
-Want to know more? Read on...
+Want to know more about the motivations for this library? Read on in the
+[Background](#background) section.
 
-## The problem
+## FAQ
+
+### How do I watch stdout?
+
+If you're using `MuonTrap.cmd/3`, you don't get the called program's output
+until after it exits. Just like `System.cmd/3`, the `:into` option can be used
+to get the output as it's printed. Here's an example.
+
+```elixir
+MuonTrap.cmd("my_program", [], stderr_to_stdout: true, into: IO.binstream(:stdio, :line))
+```
+
+If you're using `MuonTrap.Daemon`, then the best way is to send output to the
+logger. There are quite a few options, so see the `MuonTrap.Daemon` docs on what
+makes sense for you.
+
+### How do I stop a MuonTrap.Daemon?
+
+Treat the `MuonTrap.Daemon` process just like any other Elixir process. If you
+put it in a supervision tree, call `Supervisor.terminate_child/2`. If you have
+it's pid, call `Process.exit/2`.
+
+## Background
 
 The Erlang VM's port interface lets Elixir applications run external programs.
 This is important since it's not practical to rewrite everything in Elixir.

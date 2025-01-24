@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.6.0
+
+* New feature
+  * Add `:logger_fun` option to `MuonTrap.Daemon` to allow complete
+    customization of the logging process. Pass it a 1-arity function or `mfargs`
+    tuple. This option takes precedence over all of the other log related
+    options.  (@bjyoungblood)
+
 ## v1.5.0
 
 * New feature

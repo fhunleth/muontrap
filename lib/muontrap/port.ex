@@ -75,7 +75,7 @@ defmodule MuonTrap.Port do
   defp muontrap_arg({:stdio_window, count}), do: ["--stdio-window", to_string(count)]
   defp muontrap_arg({:stderr_to_stdout, true}), do: ["--capture-stderr"]
 
-  defp muontrap_arg({log_opt, _}) when log_opt in [:log_output, :custom_logger],
+  defp muontrap_arg({log_opt, _}) when log_opt in [:log_output, :logger_fun],
     do: ["--capture-output"]
 
   defp muontrap_arg({:cgroup_controllers, controllers}) do

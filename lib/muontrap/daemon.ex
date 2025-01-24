@@ -24,7 +24,7 @@ defmodule MuonTrap.Daemon do
   the following additions:
 
   * `:name` - Name the Daemon GenServer
-  * `:custom_logger` - Pass a 1-arity function or `t:mfa/0` to replace the default
+  * `:logger_fun` - Pass a 1-arity function or `t:mfa/0` to replace the default
     logging behavior. When set, `:log_output`, `:log_prefix`, `:log_transform`,
     and `:logger_metadata` will be ignored.
   * `:log_output` - When set, send output from the command to the Logger.
@@ -61,10 +61,7 @@ defmodule MuonTrap.Daemon do
     :command,
     :port,
     :cgroup_path,
-    :custom_logger,
-    :log_output,
-    :log_prefix,
-    :log_transform,
+    :logger_fun,
     :exit_status_to_reason,
     :output_byte_count
   ]
@@ -155,14 +152,24 @@ defmodule MuonTrap.Daemon do
        command: command,
        port: port,
        cgroup_path: Map.get(options, :cgroup_path),
-       custom_logger: Map.get(options, :custom_logger),
-       log_output: Map.get(options, :log_output),
-       log_prefix: Map.get(options, :log_prefix, command <> ": "),
-       log_transform: Map.get(options, :log_transform, &default_transform/1),
+       logger_fun: logger_fun(options, command),
        exit_status_to_reason:
          Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end),
        output_byte_count: 0
      }}
+  end
+
+  defp logger_fun(%{logger_fun: fun}, _command) when is_function(fun, 1), do: fun
+  defp logger_fun(%{logger_fun: {m, f, a}}, _command), do: &apply(m, f, [&1 | a])
+
+  defp logger_fun(options, command) do
+    log_output = Map.get(options, :log_output)
+    log_prefix = Map.get(options, :log_prefix, command <> ": ")
+    log_transform = Map.get(options, :log_transform, &default_transform/1)
+
+    fn line ->
+      Logger.log(log_output, [log_prefix, log_transform.(line)])
+    end
   end
 
   if Version.match?(System.version(), ">= 1.16.0") do
@@ -243,21 +250,9 @@ defmodule MuonTrap.Daemon do
   defp split_and_log(data, state) do
     {lines, remainder} = process_data(state.buffer <> data)
 
-    Enum.each(lines, &log_line(&1, state))
+    Enum.each(lines, &state.logger_fun.(&1))
 
     %{state | buffer: remainder}
-  end
-
-  defp log_line(line, state) do
-    case state.custom_logger do
-      logger when is_function(logger, 1) -> logger.(line)
-      {m, f, a} when is_atom(m) and is_atom(f) -> apply(m, f, [line | a])
-      nil -> default_log_line(line, state)
-    end
-  end
-
-  defp default_log_line(line, state) do
-    Logger.log(state.log_output, [state.log_prefix, state.log_transform.(line)])
   end
 
   @doc false

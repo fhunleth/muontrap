@@ -211,7 +211,7 @@ defmodule DaemonTest do
         start_supervised(
           daemon_spec(test_path("echo_stdio.test"), [],
             log_output: :error,
-            custom_logger: logger,
+            logger_fun: logger,
             stderr_to_stdout: false
           )
         )
@@ -235,7 +235,7 @@ defmodule DaemonTest do
         start_supervised(
           daemon_spec(test_path("echo_stdio.test"), [],
             log_output: :error,
-            custom_logger: {__MODULE__, :custom_logger_fun},
+            logger_fun: {__MODULE__, :logger_fun_fun},
             stderr_to_stdout: false
           )
         )
@@ -248,7 +248,7 @@ defmodule DaemonTest do
     log_output = capture_log(fun)
 
     assert log_output =~ "stdout here"
-    refute log_output =~ "custom_logger"
+    refute log_output =~ "logger_fun"
 
     stop_supervised(:test_daemon)
 
@@ -257,7 +257,7 @@ defmodule DaemonTest do
         start_supervised(
           daemon_spec(test_path("echo_stdio.test"), [],
             log_output: :error,
-            custom_logger: {__MODULE__, :custom_logger_fun, ["custom_logger: "]},
+            logger_fun: {__MODULE__, :logger_fun_fun, ["logger_fun: "]},
             stderr_to_stdout: false
           )
         )
@@ -269,11 +269,11 @@ defmodule DaemonTest do
 
     log_output = capture_log(fun)
 
-    assert log_output =~ "custom_logger: stdout here"
+    assert log_output =~ "logger_fun: stdout here"
   end
 
-  @spec custom_logger_fun(binary(), binary()) :: :ok
-  def custom_logger_fun(line, prefix \\ "") do
+  @spec logger_fun_fun(binary(), binary()) :: :ok
+  def logger_fun_fun(line, prefix \\ "") do
     require Logger
     Logger.info([prefix, line])
   end

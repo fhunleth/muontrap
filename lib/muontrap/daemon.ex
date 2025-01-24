@@ -141,6 +141,7 @@ defmodule MuonTrap.Daemon do
 
     port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
 
+    # Logger.metadata/0 has a side effect to set the metadata for the current process
     options
     |> Map.get(:logger_metadata, [])
     |> Keyword.merge(muontrap_cmd: command, muontrap_args: Enum.join(args, " "))

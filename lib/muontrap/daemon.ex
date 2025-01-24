@@ -24,8 +24,9 @@ defmodule MuonTrap.Daemon do
   the following additions:
 
   * `:name` - Name the Daemon GenServer
-  * `:logger_fun` - Pass a 1-arity function or `t:mfa/0` to replace the default
-    logging behavior. When set, `:log_output`, `:log_prefix`, `:log_transform`,
+  * `:logger_fun` - Pass a 1-arity function or `t:mfargs/0` tuple to replace
+    the default logging behavior. When set, `:log_output`, `:log_prefix`,
+    `:log_transform`,
     and `:logger_metadata` will be ignored.
   * `:log_output` - When set, send output from the command to the Logger.
     Specify the log level (e.g., `:debug`)

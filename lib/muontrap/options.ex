@@ -30,7 +30,7 @@ defmodule MuonTrap.Options do
   * `:log_output` - `MuonTrap.Daemon`-only, ignored if logger_fun is set
   * `:log_prefix` - `MuonTrap.Daemon`-only, ignored if logger_fun is set
   * `:log_transform` - `MuonTrap.Daemon`-only, ignored if logger_fun is set
-  * `:logger_metadata` - `MuonTrap.Daemon`-only, ignored if logger_fun is set
+  * `:logger_metadata` - `MuonTrap.Daemon`-only, ignored if logger_fun is set and doesn't call the Elixir Logger
   * `:stdio_window`
   * `:exit_status_to_reason` - `MuonTrap.Daemon`-only
   * `:cgroup_controllers`

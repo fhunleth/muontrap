@@ -4,7 +4,7 @@
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
 [![REUSE status](https://api.reuse.software/badge/github.com/fhunleth/muontrap)](https://api.reuse.software/info/github.com/fhunleth/muontrap)
 
-Keep programs, deamons, and applications launched from Erlang and Elixir
+Keep programs, daemons, and applications launched from Erlang and Elixir
 contained and well-behaved. This lightweight library kills OS processes if the
 Elixir process running them crashes and if you're running on Linux, it can use
 cgroups to prevent many other shenanigans.

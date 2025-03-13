@@ -612,20 +612,20 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
         if (fds[0].revents & POLLIN) {
             uint8_t acknowledgments[32];
             ssize_t amt = read(STDIN_FILENO, acknowledgments, sizeof(acknowledgments));
-            if (amt < 0) {
-                INFO("read STDIN_FILENO");
-                return EXIT_FAILURE;
-            }
+            if (amt >= 0) {
+                // More than one acknowledgment may have come in, so process them all.
+                // NOTE: each ack is 1+its_value
+                int total_acks = amt;
+                for (ssize_t i = 0; i < amt; i++)
+                    total_acks += acknowledgments[i];
 
-            // More than one acknowledgment may have come in, so process them all.
-            // NOTE: each ack is 1+its_value
-            int total_acks = amt;
-            for (ssize_t i = 0; i < amt; i++)
-                total_acks += acknowledgments[i];
-
-            stdio_bytes_avail += total_acks;
-            if (stdio_bytes_avail > stdio_bytes_max) {
-                WARNX("Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
+                stdio_bytes_avail += total_acks;
+                if (stdio_bytes_avail > stdio_bytes_max) {
+                    WARNX("Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
+                    return EXIT_FAILURE;
+                }
+            } else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                INFO("read STDIN_FILENO error: %s", strerror(errno));
                 return EXIT_FAILURE;
             }
         }

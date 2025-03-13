@@ -613,7 +613,12 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
             uint8_t acknowledgments[32];
             ssize_t amt = read(STDIN_FILENO, acknowledgments, sizeof(acknowledgments));
             if (amt < 0) {
-                INFO("read STDIN_FILENO");
+                INFO("read STDIN_FILENO error: %s", strerror(errno));
+
+                if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                    continue;
+                }
+
                 return EXIT_FAILURE;
             }
 

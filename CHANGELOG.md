@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6.1
+
+* Bug fixes
+  * Ignore transient EAGAIN, EWOULDBLOCK, and EINTR errors when processing
+    acknowledgments from Erlang. These would cause unneeded restarts.
+    (@mediremi)
+
 ## v1.6.0
 
 * New feature

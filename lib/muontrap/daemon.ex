@@ -1,4 +1,10 @@
 # SPDX-FileCopyrightText: 2018 Frank Hunleth
+# SPDX-FileCopyrightText: 2018 Matt Ludwigs
+# SPDX-FileCopyrightText: 2021 Aldebaran Alonso
+# SPDX-FileCopyrightText: 2023 Eric Rauer
+# SPDX-FileCopyrightText: 2023 Jon Carstens
+# SPDX-FileCopyrightText: 2024 Ben Youngblood
+# SPDX-FileCopyrightText: 2024 Milan Vit
 #
 # SPDX-License-Identifier: Apache-2.0
 

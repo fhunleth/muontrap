@@ -1,7 +1,8 @@
 # MuonTrap
 
-[![CircleCI](https://dl.circleci.com/status-badge/img/gh/fhunleth/muontrap/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/fhunleth/muontrap/tree/main)
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
+[![API docs](https://img.shields.io/hexpm/v/muontrap.svg?label=hexdocs "API docs")](https://hexdocs.pm/muontrap/MuonTrap.html)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/fhunleth/muontrap/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/fhunleth/muontrap/tree/main)
 [![REUSE status](https://api.reuse.software/badge/github.com/fhunleth/muontrap)](https://api.reuse.software/info/github.com/fhunleth/muontrap)
 
 Keep programs, daemons, and applications launched from Erlang and Elixir

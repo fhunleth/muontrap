@@ -170,7 +170,7 @@ defmodule MuonTrapTest do
       # There is a bug in OTP where find_executable is finding
       # entries on the current directory. If this is the case,
       # we should avoid the assertion below.
-      unless System.find_executable(@echo) do
+      if !System.find_executable(@echo) do
         assert :enoent = catch_error(MuonTrap.cmd(@echo, ["hello"]))
       end
 

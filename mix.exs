@@ -21,12 +21,7 @@ defmodule MuonTrap.MixProject do
       dialyzer: [
         flags: [:missing_return, :extra_return, :unmatched_returns, :error_handling, :underspecs]
       ],
-      package: package(),
-      preferred_cli_env: %{
-        docs: :docs,
-        "hex.publish": :docs,
-        "hex.build": :docs
-      }
+      package: package()
     ]
   end
 
@@ -35,6 +30,10 @@ defmodule MuonTrap.MixProject do
 
   def application do
     [extra_applications: [:logger]]
+  end
+
+  def cli do
+    [preferred_envs: %{docs: :docs, "hex.publish": :docs, "hex.build": :docs}]
   end
 
   defp deps() do

@@ -62,7 +62,7 @@ defmodule MuonTrap.Options do
   def validate(context, cmd, args, opts) when context in [:cmd, :daemon] do
     assert_no_null_byte!(cmd, context)
 
-    unless Enum.all?(args, &is_binary/1) do
+    if !Enum.all?(args, &is_binary/1) do
       raise ArgumentError, "all arguments for #{operation(context)} must be binaries"
     end
 

@@ -73,6 +73,7 @@ defmodule MuonTrap do
     * `:env` - an enumerable of tuples containing environment key-value as binary
     * `:arg0` - sets the command arg0
     * `:stderr_to_stdout` - redirects stderr to stdout when `true`
+    * `:capture_stderr_only` - when `true`, captures only stderr and ignores stdout (useful for capturing errors while ignoring normal output)
     * `:parallelism` - when `true`, the VM will schedule port tasks to improve
       parallelism in the system. If set to `false`, the VM will try to perform
       commands immediately, improving latency at the expense of parallelism.

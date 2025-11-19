@@ -553,4 +553,61 @@ defmodule DaemonTest do
       assert output =~ "** MuonTrap filtered 14 non-UTF8 bytes **"
     end
   end
+
+  test "daemon captures only stderr when capture_stderr_only is set" do
+    fun = fn ->
+      {:ok, pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_both.test"), [],
+            log_output: :error,
+            capture_stderr_only: true
+          )
+        )
+
+      wait_for_output(pid, 15, 500)
+      Logger.flush()
+    end
+
+    log = capture_log(fun)
+    assert log =~ "stderr message"
+    refute log =~ "stdout message"
+  end
+
+  test "daemon captures both stdout and stderr when both options are used" do
+    fun = fn ->
+      {:ok, pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_both.test"), [],
+            log_output: :error,
+            stderr_to_stdout: true
+          )
+        )
+
+      wait_for_output(pid, 30, 500)
+      Logger.flush()
+    end
+
+    log = capture_log(fun)
+    assert log =~ "stderr message"
+    assert log =~ "stdout message"
+  end
+
+  test "daemon captures only stdout when stderr_to_stdout is false" do
+    fun = fn ->
+      {:ok, pid} =
+        start_supervised(
+          daemon_spec(test_path("echo_both.test"), [],
+            log_output: :error,
+            stderr_to_stdout: false
+          )
+        )
+
+      wait_for_output(pid, 15, 500)
+      Logger.flush()
+    end
+
+    log = capture_log(fun)
+    refute log =~ "stderr message"
+    assert log =~ "stdout message"
+  end
 end

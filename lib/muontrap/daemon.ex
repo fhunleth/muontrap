@@ -46,6 +46,9 @@ defmodule MuonTrap.Daemon do
     cannot be overridden.
   * `:stderr_to_stdout` - When set to `true`, redirect stderr to stdout.
     Defaults to `false`.
+  * `:capture_stderr_only` - When set to `true`, capture only stderr and ignore stdout.
+    This is useful when you want to capture error messages but not regular output.
+    Defaults to `false`.
   * `:exit_status_to_reason` - Optional function to convert the exit status (a
     number) to stop reason for the Daemon GenServer. Use if error exit codes
     carry information or aren't errors.

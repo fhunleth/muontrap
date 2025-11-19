@@ -55,6 +55,7 @@ static struct option long_options[] = {
     {"stdio-window", required_argument, 0, 'l'},
     {"capture-output", no_argument, 0, 'o'},
     {"capture-stderr", no_argument, 0, 'e'},
+    {"capture-stderr-only", no_argument, 0, 'r'},
     {0,          0,                 0, 0 }
 };
 
@@ -90,6 +91,7 @@ static int stdio_bytes_max = DEFAULT_STDIO_WINDOW;
 static int stdio_bytes_avail = DEFAULT_STDIO_WINDOW;
 static int capture_output = 0; // Don't capture output by default
 static int capture_stderr = 0; // If capturing output, don't capture stderr by default
+static int capture_stderr_only = 0; // Capture stderr only, ignore stdout
 
 #define FOREACH_CONTROLLER for (struct controller_info *controller = controllers; controller != NULL; controller = controller->next)
 
@@ -109,6 +111,7 @@ static void usage()
     printf("--stdio-window <bytes>\n");
     printf("--capture-output\n");
     printf("--capture-stderr\n");
+    printf("--capture-stderr-only\n");
     printf("--uid <uid/user> drop privilege to this uid or user\n");
     printf("--gid <gid/group> drop privilege to this gid or group\n");
     printf("-- the program to run and its arguments come after this\n");
@@ -163,7 +166,22 @@ static int fork_exec(const char *path, char *const *argv)
         // Move to the container
         move_pid_to_cgroups(getpid());
 
-        if (capture_output) {
+        if (capture_stderr_only) {
+            // Capture stderr only, send stdout to /dev/null
+            int dev_null_fd = open("/dev/null", O_WRONLY);
+            if (dev_null_fd < 0)
+                FATAL("Can't open /dev/null");
+
+            // Send stdout to /dev/null
+            if (dup2(dev_null_fd, STDOUT_FILENO) < 0)
+                FATAL("dup2 STDOUT_FILENO");
+
+            // Capture stderr
+            if (dup2(stderr_pipe[1], STDERR_FILENO) < 0)
+                FATAL("dup2 STDERR_FILENO");
+
+            close(dev_null_fd);
+        } else if (capture_output) {
             // Replace stdout a with flow controlled versions
             if (dup2(stdout_pipe[1], STDOUT_FILENO) < 0)
                 FATAL("dup2 STDOUT_FILENO");
@@ -595,6 +613,12 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
 
             if (capture_stderr)
                 poll_num++;
+        } else if (capture_stderr_only && stdio_bytes_avail > 0) {
+            // Only polling stderr in stderr-only mode
+            // fds[2] will be stderr_pipe since we're not using stdout_pipe
+            fds[2].fd = stderr_pipe[0];
+            fds[2].events = POLLIN;
+            poll_num++;
         }
 
         if (poll(fds, poll_num, -1) < 0) {
@@ -760,6 +784,10 @@ int main(int argc, char *argv[])
             capture_stderr = 1;
             break;
 
+        case 'r': // --capture-stderr-only
+            capture_stderr_only = 1;
+            break;
+
         case 's':
         {
             if (!current_controller)
@@ -820,7 +848,14 @@ int main(int argc, char *argv[])
         fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
         WARN("fcntl(FD_CLOEXEC)");
 
-    if (capture_output) {
+    if (capture_stderr_only) {
+        // Only capturing stderr, create stderr pipe
+        if (pipe(stderr_pipe) < 0)
+            FATAL("pipe");
+        if (fcntl(stderr_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
+            fcntl(stderr_pipe[1], F_SETFD, FD_CLOEXEC) < 0)
+            WARN("fcntl(FD_CLOEXEC)");
+    } else if (capture_output) {
         if (pipe(stdout_pipe) < 0)
             FATAL("pipe");
         if (fcntl(stdout_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||

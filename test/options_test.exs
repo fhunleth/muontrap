@@ -113,6 +113,7 @@ defmodule MuonTrap.OptionsTest do
       cd: "path",
       arg0: "arg0",
       stderr_to_stdout: true,
+      capture_stderr_only: true,
       parallelism: true,
       uid: 5,
       gid: "bill",
@@ -130,6 +131,7 @@ defmodule MuonTrap.OptionsTest do
       assert Map.get(options, :cd) == "path"
       assert Map.get(options, :arg0) == "arg0"
       assert Map.get(options, :stderr_to_stdout) == true
+      assert Map.get(options, :capture_stderr_only) == true
       assert Map.get(options, :parallelism) == true
       assert Map.get(options, :uid) == 5
       assert Map.get(options, :gid) == "bill"

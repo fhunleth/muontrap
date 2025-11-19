@@ -26,6 +26,7 @@ defmodule MuonTrap.Options do
   * `:cd`
   * `:arg0`
   * `:stderr_to_stdout`
+  * `:capture_stderr_only`
   * `:parallelism`
   * `:env`
   * `:name` - `MuonTrap.Daemon`-only
@@ -105,6 +106,9 @@ defmodule MuonTrap.Options do
 
   defp validate_option(_any, {:stderr_to_stdout, bool}, opts) when is_boolean(bool),
     do: Map.put(opts, :stderr_to_stdout, bool)
+
+  defp validate_option(_any, {:capture_stderr_only, bool}, opts) when is_boolean(bool),
+    do: Map.put(opts, :capture_stderr_only, bool)
 
   defp validate_option(_any, {:parallelism, bool}, opts) when is_boolean(bool),
     do: Map.put(opts, :parallelism, bool)

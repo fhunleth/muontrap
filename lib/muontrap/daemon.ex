@@ -175,11 +175,16 @@ defmodule MuonTrap.Daemon do
 
   defp logger_fun(options, command) do
     log_output = Map.get(options, :log_output)
-    log_prefix = Map.get(options, :log_prefix, command <> ": ")
-    log_transform = Map.get(options, :log_transform, &default_transform/1)
 
-    fn line ->
-      Logger.log(log_output, [log_prefix, log_transform.(line)])
+    if log_output == nil do
+      fn _line -> :ok end
+    else
+      log_prefix = Map.get(options, :log_prefix, command <> ": ")
+      log_transform = Map.get(options, :log_transform, &default_transform/1)
+
+      fn line ->
+        Logger.log(log_output, [log_prefix, log_transform.(line)])
+      end
     end
   end
 

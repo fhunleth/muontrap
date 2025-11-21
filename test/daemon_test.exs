@@ -573,6 +573,27 @@ defmodule DaemonTest do
     refute log =~ "stdout message"
   end
 
+  test "daemon captures stderr only without log_output (no crash)" do
+    {:ok, pid} =
+      start_supervised(
+        daemon_spec(test_path("echo_stderr.test"), [],
+          # no log_output & no logger_fun, so no logging
+          # even if capture_stderr_only is true
+          capture_stderr_only: true
+        )
+      )
+
+    os_pid = Daemon.os_pid(pid)
+    assert_os_pid_running(os_pid)
+
+    wait_for_output(pid, 15, 500)
+
+    :ok = stop_supervised(:test_daemon)
+
+    wait_for_close_check()
+    assert_os_pid_exited(os_pid)
+  end
+
   test "daemon captures both stdout and stderr when both options are used" do
     fun = fn ->
       {:ok, pid} =

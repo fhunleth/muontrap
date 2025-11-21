@@ -608,17 +608,17 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
     for (;;) {
         poll_num = 2;
         // Also poll stdout and optionally stderr when capturing output and accepting stdio data
-        if (capture_output && stdio_bytes_avail > 0) {
-            poll_num++;
-
-            if (capture_stderr)
-                poll_num++;
-        } else if (capture_stderr_only && stdio_bytes_avail > 0) {
+        if (capture_stderr_only && stdio_bytes_avail > 0) {
             // Only polling stderr in stderr-only mode
             // fds[2] will be stderr_pipe since we're not using stdout_pipe
             fds[2].fd = stderr_pipe[0];
             fds[2].events = POLLIN;
             poll_num++;
+        } else if (capture_output && stdio_bytes_avail > 0) {
+            poll_num++;
+
+            if (capture_stderr)
+                poll_num++;
         }
 
         if (poll(fds, poll_num, -1) < 0) {

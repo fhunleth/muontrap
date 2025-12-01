@@ -1,10 +1,11 @@
 version: 2.1
 
 latest: &latest
-  pattern: "^1.18.*-erlang-27.*$"
+  pattern: "^1.19.*-erlang-28.*$"
 
 tags: &tags
   [
+    1.19.4-erlang-28.2-alpine-3.22.2,
     1.18.4-erlang-27.3.3-alpine-3.21.3,
     1.17.3-erlang-27.1.3-alpine-3.20.3,
     1.16.1-erlang-26.2.2-alpine-3.19.1,

@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## v1.7.0
 
 * New feature
   * Add `:capture_stderr_only` option to capture only stderr while ignoring stdout.
     This is useful when you want to capture error messages but not regular output.
-    Works with both `MuonTrap.cmd/3` and `MuonTrap.Daemon`.
+    Works with both `MuonTrap.cmd/3` and `MuonTrap.Daemon`. (@fermuch)
 
 ## v1.6.1
 

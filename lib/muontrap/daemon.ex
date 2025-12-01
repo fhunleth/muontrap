@@ -5,6 +5,7 @@
 # SPDX-FileCopyrightText: 2023 Jon Carstens
 # SPDX-FileCopyrightText: 2024 Ben Youngblood
 # SPDX-FileCopyrightText: 2024 Milan Vit
+# SPDX-FileCopyrightText: 2025 Fernando Mumbach
 #
 # SPDX-License-Identifier: Apache-2.0
 

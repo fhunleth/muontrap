@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024
+// SPDX-FileCopyrightText: 2024 Frank Hunleth
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,7 +12,7 @@ int main()
     fflush(stdout);
     fprintf(stderr, "stderr message\n");
     fflush(stderr);
-    
+
     // Hang out long enough to satisfy the tests
     sleep(120);
     exit(0);

@@ -147,6 +147,9 @@ defmodule DaemonTest do
   end
 
   test "daemon does not log output to stderr when not told" do
+    # Need to disable ANSI since new line in log message is important
+    Application.put_env(:elixir, :ansi_enabled, false)
+
     fun = fn ->
       {:ok, pid} =
         start_supervised(
@@ -161,7 +164,11 @@ defmodule DaemonTest do
       Logger.flush()
     end
 
-    assert capture_log(fun) =~ "echo_stdio.test: stdout here\n"
+    result = capture_log(fun)
+    assert result =~ "echo_stdio.test: stdout here\n"
+    refute result =~ ".."
+
+    Application.delete_env(:elixir, :ansi_enabled)
   end
 
   test "daemon logs to a custom prefix" do

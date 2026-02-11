@@ -73,11 +73,11 @@ defmodule CgroupTest do
     assert_os_pid_running(os_pid)
     assert memory_cgroup_exists(cgroup_path)
 
-    {:ok, memory_str} = Cgroups.cgget("memory", cgroup_path, "memory.limit_in_bytes")
-    {memory, _} = Integer.parse(memory_str)
-    assert memory > 1000
+    {:ok, memory_str} = Cgroups.cgget("memory", cgroup_path, "memory.max")
+    # memory.max returns "max" if unlimited, or a number
+    assert memory_str == "max\n" or String.to_integer(String.trim(memory_str)) > 1000
 
-    # :ok = Cgroups.cgset("memory", cgroup_path, "memory.limit_in_bytes", "900")
+    # :ok = Cgroups.cgset("memory", cgroup_path, "memory.max", "900")
 
     Port.close(port)
   end

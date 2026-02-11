@@ -24,15 +24,22 @@ defmodule MuonTrap.Cgroups do
   """
   @spec get_controllers() :: {:ok, [String.t()]} | {:error, :enoent}
   def get_controllers() do
-    File.ls("/sys/fs/cgroup")
+    case File.read("/sys/fs/cgroup/cgroup.controllers") do
+      {:ok, content} ->
+        controllers = content |> String.trim() |> String.split()
+        {:ok, controllers}
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   @doc """
   Get a cgroup variable (like cgget)
   """
   @spec cgget(String.t(), String.t(), String.t()) :: {:ok, String.t()} | {:error, File.posix()}
-  def cgget(controller, cgroup_path, variable_name) do
-    path = Path.join([@cgroup_fs, controller, cgroup_path, variable_name])
+  def cgget(_controller, cgroup_path, variable_name) do
+    path = Path.join([@cgroup_fs, cgroup_path, variable_name])
     File.read(path)
   end
 
@@ -40,8 +47,8 @@ defmodule MuonTrap.Cgroups do
   Set a cgroup variable (like cgset)
   """
   @spec cgset(String.t(), String.t(), String.t(), String.t()) :: :ok | {:error, File.posix()}
-  def cgset(controller, cgroup_path, variable_name, value) do
-    path = Path.join([@cgroup_fs, controller, cgroup_path, variable_name])
+  def cgset(_controller, cgroup_path, variable_name, value) do
+    path = Path.join([@cgroup_fs, cgroup_path, variable_name])
     File.write(path, value)
   end
 end

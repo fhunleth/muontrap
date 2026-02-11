@@ -27,24 +27,25 @@ defmodule MuonTrap do
 
   ## Configuring cgroups
 
-  On most Linux distributions, use `cgcreate` to create a new cgroup.  You can
-  name them almost anything. The command below creates one named `muontrap` for
-  the current user. It supports memory and CPU controls.
+  MuonTrap now supports cgroup v2 (unified hierarchy). To create a new cgroup,
+  you can use `mkdir` and `chown` to set up a cgroup with appropriate permissions.
+  For example:
 
   ```sh
-  sudo cgcreate -a $(whoami) -g memory,cpu:muontrap
+  sudo mkdir -p /sys/fs/cgroup/muontrap
+  sudo chown -R $(whoami) /sys/fs/cgroup/muontrap
   ```
 
-  Nerves systems do not contain `cgcreate` by default. Due to the simpler Linux
-  setup, it may be sufficient to run `File.mkdir_p(cgroup_path)` to create a
-  cgroup. For example:
+  On Nerves systems, it may be sufficient to run `File.mkdir_p(cgroup_path)` to create a
+  cgroup if you have appropriate permissions:
 
   ```elixir
-  File.mkdir_p("/sys/fs/cgroup/memory/muontrap")
+  File.mkdir_p("/sys/fs/cgroup/muontrap")
   ```
 
-  This creates the cgroup path, `muontrap` under the `memory` controller.  If
-  you do not have the `"/sys/fs/cgroup"` directory, you will need to mount it
+  In cgroup v2, all controllers are available in the unified hierarchy at
+  `/sys/fs/cgroup`, so you don't need to create separate directories for each controller.
+  If you do not have the `"/sys/fs/cgroup"` directory, you will need to mount it
   or update your `erlinit.config` to mount it for you. See a newer official
   system for an example.
   """
@@ -89,17 +90,18 @@ defmodule MuonTrap do
   {"hello\n", 0}
   ```
 
-  The next examples only run on Linux. To try this out, create new cgroups:
+  The next examples only run on Linux. To try this out, create a new cgroup:
 
   ```sh
-  sudo cgcreate -a $(whoami) -g memory,cpu:muontrap
+  sudo mkdir -p /sys/fs/cgroup/muontrap
+  sudo chown -R $(whoami) /sys/fs/cgroup/muontrap
   ```
 
   Run a command, but limit memory so severely that it doesn't work (for demo
   purposes, obviously):
 
   ```elixir
-  iex-donttest> MuonTrap.cmd("echo", ["hello"], cgroup_controllers: ["memory"], cgroup_path: "muontrap/test", cgroup_sets: [{"memory", "memory.limit_in_bytes", "8192"}])
+  iex-donttest> MuonTrap.cmd("echo", ["hello"], cgroup_controllers: ["memory"], cgroup_path: "muontrap/test", cgroup_sets: [{"memory", "memory.max", "8192"}])
   {"", 1}
   ```
 

@@ -49,7 +49,8 @@ like the following:
 Running on Linux and can use cgroups? Then create a new cgroup:
 
 ```bash
-sudo cgcreate -a $(whoami) -g memory:mycgroup
+sudo mkdir -p /sys/fs/cgroup/mycgroup
+sudo chown -R $(whoami) /sys/fs/cgroup/mycgroup
 ```
 
 ```elixir
@@ -187,12 +188,12 @@ will do; `muontrap` just needs to be able to create a subdirectory underneath it
 for its use. For example:
 
 ```bash
-sudo cgcreate -a $(whoami) -g memory,cpu:mycgroup
+sudo mkdir -p /sys/fs/cgroup/mycgroup
+sudo chown -R $(whoami) /sys/fs/cgroup/mycgroup
 ```
 
-Be sure to create the group for all of the cgroup controllers that you wish to
-use with `muontrap`. The above example creates it for the `memory` and `cpu`
-controllers.
+With cgroup v2 (unified hierarchy), all controllers are available in the same
+hierarchy, so you don't need to specify them when creating the base directory.
 
 In Elixir, call `MuonTrap.cmd/3` with the
 cgroup options now. In this case, we'll use the `cpu` controller, but this
@@ -203,9 +204,9 @@ iex>  MuonTrap.cmd("spawning_program", [], cgroup_controllers: ["cpu"], cgroup_b
 {"hello\n", 0}
 ```
 
-In this example, `muontrap` runs `spawning_program` in a sub-cgroup under the
-`cpu/mycgroup` group. The cgroup parameters may be modified outside of
-`muontrap` using `cgset` or my accessing the cgroup mountpoint manually.
+In this example, `muontrap` runs `spawning_program` in a sub-cgroup under
+`mycgroup`. The cgroup parameters may be modified outside of
+`muontrap` using the cgroup v2 interface files or by accessing the cgroup mountpoint manually.
 
 On any error or if the Erlang VM closes the port or if `spawning_program` exits,
 `muontrap` will kill all OS processes in cgroup. No need to worry about
@@ -225,21 +226,20 @@ surface. If you'd like to limit an OS process and all of its child processes to
 a maximum amount of memory, you can do that with the `memory` controller:
 
 ```elixir
-iex>  MuonTrap.cmd("memory_hog", [], cgroup_controllers: ["memory"], cgroup_base: "mycgroup", cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}])
+iex>  MuonTrap.cmd("memory_hog", [], cgroup_controllers: ["memory"], cgroup_base: "mycgroup", cgroup_sets: [{"memory", "memory.max", "268435456"}])
 ```
 
 That line restricts the total memory used by `memory_hog` to 256 MB.
 
 ### Limit CPU usage in a port
 
-Limiting the maximum CPU usage is also possible. Two parameters control that
-with the `cpu` controller: `cpu.cfs_period_us` specifies the number of
-microseconds in the scheduling period and `cpu.cfs_quota_us` specifies how many
-of those microseconds can be used. Here's an example call that prevents a
+Limiting the maximum CPU usage is also possible. In cgroup v2, the `cpu.max`
+file controls CPU bandwidth. It accepts two space-separated values: the quota
+and the period (both in microseconds). Here's an example call that prevents a
 program from using more than 50% of the CPU:
 
 ```elixir
-iex>  MuonTrap.cmd("cpu_hog", [], cgroup_controllers: ["cpu"], cgroup_base: "mycgroup", cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}, {"cpu", "cpu.cfs_quota_us", 50000}])
+iex>  MuonTrap.cmd("cpu_hog", [], cgroup_controllers: ["cpu"], cgroup_base: "mycgroup", cgroup_sets: [{"cpu", "cpu.max", "50000 100000"}])
 ```
 
 ## Supervision
@@ -300,16 +300,16 @@ allowed. The default is 10 KB.
 
 ## muontrap development
 
-In order to run the tests, some additional tools need to be installed.
-Specifically the `cgcreate` and `cgget` binaries need to be installed (and
-available on `$PATH`). Typically the package may be called `cgroup-tools` (on
-arch linux you need to install the `libcgroup` aur package).
-
-Then run:
+In order to run the tests, you need to set up a cgroup for testing with
+appropriate permissions:
 
 ```sh
-sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test
+sudo mkdir -p /sys/fs/cgroup/muontrap_test
+sudo chown -R $(whoami) /sys/fs/cgroup/muontrap_test
 ```
+
+This works with cgroup v2 (unified hierarchy). Make sure your system has
+cgroup v2 mounted at `/sys/fs/cgroup`.
 
 ## License
 

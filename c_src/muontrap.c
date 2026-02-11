@@ -165,7 +165,8 @@ static int fork_exec(const char *path, char *const *argv)
         // child
 
         // Move to the container
-        move_pid_to_cgroups(getpid());
+        if (cgroup_path)
+            move_pid_to_cgroups(getpid());
 
         if (capture_stderr_only) {
             // Capture stderr only, send stdout to /dev/null
@@ -858,7 +859,8 @@ int main(int argc, char *argv[])
     if (cgroup_path && !controllers)
         FATALX("Specify a cgroup controller (-c) if you specify a group_path");
 
-    finish_controller_init();
+    if (cgroup_path)
+        finish_controller_init();
 
     // Finished processing commandline. Initialize and run child.
 
@@ -893,11 +895,13 @@ int main(int argc, char *argv[])
 
     enable_signal_handlers();
 
-    create_cgroups();
+    if (cgroup_path) {
+        create_cgroups();
 
-    enable_controllers();
+        enable_controllers();
 
-    update_cgroup_settings();
+        update_cgroup_settings();
+    }
 
     const char *program_name = argv[optind];
     if (argv0)
@@ -913,9 +917,11 @@ int main(int argc, char *argv[])
     }
 
     // Cleanup all descendents if using cgroups
-    cleanup_all_children();
-
-    destroy_cgroups();
+    if (cgroup_path) {
+        cleanup_all_children();
+        destroy_cgroups();
+    }
+    
     disable_signal_handlers();
 
     exit(exit_status);

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: None
+# SPDX-License-Identifier: CC0-1.0
+
 version: 2.1
 
 latest: &latest
@@ -5,7 +8,7 @@ latest: &latest
 
 tags: &tags
   [
-    1.19.4-erlang-28.2-alpine-3.22.2,
+    1.19.5-erlang-28.5-alpine-3.23.4,
     1.18.4-erlang-27.3.3-alpine-3.21.3,
     1.17.3-erlang-27.1.3-alpine-3.20.3,
     1.16.1-erlang-26.2.2-alpine-3.19.1,
@@ -67,7 +70,10 @@ jobs:
 workflows:
   checks:
     jobs:
-      - check-license
+      - check-license:
+          filters:
+            tags:
+              only: /.*/
       - build-test:
           name: << matrix.tag >>
           matrix:

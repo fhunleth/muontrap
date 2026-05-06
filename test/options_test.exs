@@ -106,6 +106,26 @@ defmodule MuonTrap.OptionsTest do
     assert_raise ArgumentError, fn ->
       Options.validate(:cmd, "echo", [], logger_fun: &Function.identity/1)
     end
+
+    # :wait_for is :daemon-only and must be a 0-arity function
+    wait_fun = fn -> :ok end
+
+    assert is_function(
+             Map.get(Options.validate(:daemon, "echo", [], wait_for: wait_fun), :wait_for),
+             0
+           )
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:cmd, "echo", [], wait_for: wait_fun)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:daemon, "echo", [], wait_for: :not_a_fun)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Options.validate(:daemon, "echo", [], wait_for: &Function.identity/1)
+    end
   end
 
   test "common commands basically work" do

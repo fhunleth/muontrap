@@ -639,4 +639,70 @@ defmodule DaemonTest do
     refute log =~ "stderr message"
     assert log =~ "stdout message"
   end
+
+  test "wait_for defers launching the OS process until it returns" do
+    parent = self()
+
+    wait_fun = fn ->
+      send(parent, {:wait_started, self()})
+
+      receive do
+        :proceed -> :ok
+      end
+    end
+
+    {:ok, pid} =
+      start_supervised(daemon_spec(test_path("do_nothing.test"), [], wait_for: wait_fun))
+
+    assert_receive {:wait_started, task_pid}, 1000
+    assert :error == Daemon.os_pid(pid)
+    assert Process.alive?(task_pid)
+
+    send(task_pid, :proceed)
+
+    os_pid = wait_for_os_pid(pid)
+    assert_os_pid_running(os_pid)
+  end
+
+  test "wait_for raising crashes the daemon via the link" do
+    Process.flag(:trap_exit, true)
+
+    {:ok, pid} =
+      Daemon.start_link(test_path("do_nothing.test"), [], wait_for: fn -> raise "boom" end)
+
+    assert_receive {:EXIT, ^pid, {%RuntimeError{message: "boom"}, _}}, 1000
+  end
+
+  test "stopping the daemon while wait_for is still running terminates the wait task" do
+    parent = self()
+
+    wait_fun = fn ->
+      send(parent, {:wait_started, self()})
+      Process.sleep(:infinity)
+    end
+
+    {:ok, _pid} =
+      start_supervised(daemon_spec(test_path("do_nothing.test"), [], wait_for: wait_fun))
+
+    assert_receive {:wait_started, task_pid}, 1000
+    ref = Process.monitor(task_pid)
+
+    :ok = stop_supervised(:test_daemon)
+
+    assert_receive {:DOWN, ^ref, :process, ^task_pid, _}, 1000
+  end
+
+  defp wait_for_os_pid(pid, attempts \\ 50)
+  defp wait_for_os_pid(_pid, 0), do: flunk("OS process never started")
+
+  defp wait_for_os_pid(pid, attempts) do
+    case Daemon.os_pid(pid) do
+      :error ->
+        Process.sleep(20)
+        wait_for_os_pid(pid, attempts - 1)
+
+      os_pid when is_integer(os_pid) ->
+        os_pid
+    end
+  end
 end

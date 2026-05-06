@@ -92,6 +92,20 @@ Treat the `MuonTrap.Daemon` process just like any other Elixir process. If you
 put it in a supervision tree, call `Supervisor.terminate_child/2`. If you have
 it's pid, call `Process.exit/2`.
 
+### How do I delay a daemon until a dependency is ready?
+
+Pass a 0-arity function via the `:wait_for` option. It runs in a linked `Task`
+before the OS process is launched, so it can block (e.g., poll a TCP port or
+wait on a file) without holding up the supervisor. The Daemon launches the
+command once the function returns; if it raises, the link tears the Daemon
+down and the supervisor's restart policy applies.
+
+```elixir
+{MuonTrap.Daemon,
+ ["my_server", [],
+  [wait_for: fn -> wait_for_tcp_port("db", 5432) end]]}
+```
+
 ## Background
 
 The Erlang VM's port interface lets Elixir applications run external programs.

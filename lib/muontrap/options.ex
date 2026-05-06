@@ -37,6 +37,7 @@ defmodule MuonTrap.Options do
   * `:logger_metadata` - `MuonTrap.Daemon`-only, ignored if logger_fun is set and doesn't call the Elixir Logger
   * `:stdio_window`
   * `:exit_status_to_reason` - `MuonTrap.Daemon`-only
+  * `:wait_for` - `MuonTrap.Daemon`-only
   * `:cgroup_controllers`
   * `:cgroup_path`
   * `:cgroup_base`
@@ -157,6 +158,16 @@ defmodule MuonTrap.Options do
   defp validate_option(:daemon, {:exit_status_to_reason, exit_status_to_reason}, opts)
        when is_function(exit_status_to_reason),
        do: Map.put(opts, :exit_status_to_reason, exit_status_to_reason)
+
+  defp validate_option(:daemon, {:wait_for, fun}, opts) when is_function(fun, 0),
+    do: Map.put(opts, :wait_for, fun)
+
+  defp validate_option(:daemon, {:wait_for, v}, _opts),
+    do:
+      raise(
+        ArgumentError,
+        "invalid option :wait_for with value #{inspect(v)}, expected a 0-arity function"
+      )
 
   # MuonTrap common options
   defp validate_option(_any, {:cgroup_controllers, controllers}, opts) when is_list(controllers),

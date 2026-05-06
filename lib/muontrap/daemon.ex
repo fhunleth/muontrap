@@ -53,6 +53,9 @@ defmodule MuonTrap.Daemon do
   * `:exit_status_to_reason` - Optional function to convert the exit status (a
     number) to stop reason for the Daemon GenServer. Use if error exit codes
     carry information or aren't errors.
+  * `:wait_for` - A 0-arity function that runs before the OS process is
+    launched. Use to wait for a required resource to be available. The return
+    value is ignored. Raise to abort the launch.
 
   If you want to run multiple `MuonTrap.Daemon`s under one supervisor, they'll
   all need unique IDs. Use `Supervisor.child_spec/2` like this:
@@ -71,10 +74,12 @@ defmodule MuonTrap.Daemon do
     :buffer,
     :command,
     :port,
+    :port_options,
     :cgroup_path,
     :logger_fun,
     :exit_status_to_reason,
-    :output_byte_count
+    :output_byte_count,
+    :wait_task
   ]
 
   @max_data_to_buffer 256
@@ -150,25 +155,36 @@ defmodule MuonTrap.Daemon do
     options = MuonTrap.Options.validate(:daemon, command, args, opts)
     port_options = MuonTrap.Port.port_options(options) ++ [:stream]
 
-    port = Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, port_options)
-
     # Logger.metadata/0 has a side effect to set the metadata for the current process
     options
     |> Map.get(:logger_metadata, [])
     |> Keyword.merge(muontrap_cmd: command, muontrap_args: Enum.join(args, " "))
     |> Logger.metadata()
 
-    {:ok,
-     %__MODULE__{
-       buffer: "",
-       command: command,
-       port: port,
-       cgroup_path: Map.get(options, :cgroup_path),
-       logger_fun: logger_fun(options, command),
-       exit_status_to_reason:
-         Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end),
-       output_byte_count: 0
-     }}
+    state = %__MODULE__{
+      buffer: "",
+      command: command,
+      port: nil,
+      port_options: port_options,
+      cgroup_path: Map.get(options, :cgroup_path),
+      logger_fun: logger_fun(options, command),
+      exit_status_to_reason:
+        Map.get(options, :exit_status_to_reason, fn _ -> :error_exit_status end),
+      output_byte_count: 0,
+      wait_task: nil
+    }
+
+    case Map.get(options, :wait_for) do
+      nil -> {:ok, start_port(state)}
+      fun -> {:ok, %{state | wait_task: Task.async(fun)}}
+    end
+  end
+
+  defp start_port(state) do
+    port =
+      Port.open({:spawn_executable, to_charlist(MuonTrap.muontrap_path())}, state.port_options)
+
+    %{state | port: port}
   end
 
   defp logger_fun(%{logger_fun: fun}, _command) when is_function(fun, 1), do: fun
@@ -220,6 +236,10 @@ defmodule MuonTrap.Daemon do
     {:reply, result, state}
   end
 
+  def handle_call(:os_pid, _from, %__MODULE__{port: nil} = state) do
+    {:reply, :error, state}
+  end
+
   def handle_call(:os_pid, _from, state) do
     os_pid =
       case Port.info(state.port, :os_pid) do
@@ -236,6 +256,11 @@ defmodule MuonTrap.Daemon do
   end
 
   @impl GenServer
+  def handle_info({ref, _result}, %__MODULE__{wait_task: %Task{ref: ref}} = state) do
+    Process.demonitor(ref, [:flush])
+    {:noreply, start_port(%{state | wait_task: nil})}
+  end
+
   def handle_info({port, {:data, message}}, %__MODULE__{port: port} = state) do
     bytes_received = byte_size(message)
     state = split_and_log(message, state)

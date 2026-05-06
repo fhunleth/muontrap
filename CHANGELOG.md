@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.8.0
+
+* New feature
+  * Add `:wait_for` option to `MuonTrap.Daemon`. This lets you specify a
+    function that can block until a file, named pipe, local server, etc. is
+    available before starting the OS process. This simplifies workarounds for OS
+    processes that don't wait or retry on inputs that come up asynchronously.
+
 ## v1.7.0
 
 * New feature

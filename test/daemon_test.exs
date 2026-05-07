@@ -489,16 +489,28 @@ defmodule DaemonTest do
           test_path("do_nothing.test"),
           [],
           cgroup_base: "muontrap_test",
-          cgroup_controllers: ["memory"]
+          cgroup: %{memory_max: 268_435_456}
         )
       )
 
     os_pid = Daemon.os_pid(pid)
     assert_os_pid_running(os_pid)
 
-    {:ok, memory_str} = Daemon.cgget(pid, "memory", "memory.limit_in_bytes")
-    {memory, _} = Integer.parse(memory_str)
-    assert memory > 1000
+    {:ok, memory_str} = Daemon.cgget(pid, "memory.max")
+    assert String.to_integer(String.trim(memory_str)) == 268_435_456
+
+    stats = Daemon.statistics(pid)
+    assert is_integer(stats.memory_current) and stats.memory_current >= 0
+    assert is_integer(stats.memory_events.oom_kill)
+    assert is_integer(stats.cpu_stat.usage_usec)
+
+    config = Daemon.cgroup_config(pid)
+    assert config.memory_max == 268_435_456
+    refute Map.has_key?(config, :cgroup_path)
+
+    path = Daemon.cgroup_path(pid)
+    assert is_binary(path)
+    assert String.starts_with?(path, "muontrap_test/")
   end
 
   test "flow control when logging" do

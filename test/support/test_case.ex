@@ -22,14 +22,12 @@ defmodule MuonTrapTest.Case do
 
   @spec cpu_cgroup_exists(String.t()) :: boolean
   def cpu_cgroup_exists(path) do
-    {rc, 0} = System.cmd("cgget", ["-g", "cpu", path], stderr_to_stdout: true)
-    String.match?(rc, ~r/cpu.shares/)
+    File.exists?(Path.join(["/sys/fs/cgroup", path, "cpu.stat"]))
   end
 
   @spec memory_cgroup_exists(String.t()) :: boolean
   def memory_cgroup_exists(path) do
-    {rc, 0} = System.cmd("cgget", ["-g", "memory", path], stderr_to_stdout: true)
-    String.match?(rc, ~r/memory.stat/)
+    File.exists?(Path.join(["/sys/fs/cgroup", path, "memory.stat"]))
   end
 
   @spec random_cgroup_path :: String.t()

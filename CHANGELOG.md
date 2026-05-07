@@ -1,5 +1,63 @@
 # Changelog
 
+## v2.0.0
+
+This release drops cgroup v1 support. cgroup v2 (the unified hierarchy) is the
+default on every mainstream distribution since 2021–2022, including recent
+Nerves systems. If you're stuck on a v1-only host, pin to MuonTrap 1.x.
+
+* Breaking changes
+  * cgroup v1 is removed. MuonTrap now requires the v2 unified hierarchy at
+    `/sys/fs/cgroup`. Setup uses standard filesystem commands (`mkdir`,
+    `chown`) plus enabling controllers in `cgroup.subtree_control` — `cgcreate`
+    is no longer needed. See the README for details.
+  * `MuonTrap.Daemon.cgget/3` and `cgset/4` lost their `controller` argument
+    (it had no meaning under v2). They are now `cgget/2` and `cgset/3`.
+  * `MuonTrap.Cgroups.cgget/3` and `cgset/4` similarly lost the `controller`
+    argument.
+  * The `:cgroup_controllers` and `:cgroup_sets` options are replaced by a
+    single `:cgroup` map keyed by atoms like `:memory_max`, `:cpu_weight`,
+    `:cpu_max`. Controllers are inferred from the keys; values use Elixir
+    types (`:max` atom, `{quota_us, period_us}` tuple for `cpu.max`,
+    booleans for flags). Passing the old keys now raises `ArgumentError`.
+
+    ```elixir
+    # before
+    cgroup_controllers: ["memory", "cpu"],
+    cgroup_sets: [
+      {"memory", "memory.max", "268435456"},
+      {"cpu", "cpu.max", "50000 100000"}
+    ]
+
+    # after
+    cgroup: %{
+      memory_max: 268_435_456,
+      cpu_max: {50_000, 100_000}
+    }
+    ```
+
+    Atom keys correspond to v2 interface files: v1's `memory.limit_in_bytes`
+    becomes `:memory_max`; the v1 pair `cpu.cfs_period_us` +
+    `cpu.cfs_quota_us` becomes `:cpu_max`; and so on. See `man 7 cgroups`.
+
+* New features
+  * `MuonTrap.Daemon.statistics/1` now returns a snapshot of every readable
+    cgroup v2 interface file alongside the existing `:output_byte_count`:
+    memory usage and peak, OOM-kill counts, parsed `cpu.stat`, PSI
+    (`cpu_pressure`, `memory_pressure`, `io_pressure`), `pids.current`,
+    `pids.peak`, `cgroup.stat`, and more. Missing files (controller not
+    enabled, PSI not compiled in) are silently omitted.
+  * `MuonTrap.Daemon.cgroup_config/1` returns the daemon's writable cgroup
+    settings as a map keyed by the same atoms accepted by the `:cgroup`
+    option, suitable for round-tripping into another daemon.
+  * `MuonTrap.Daemon.cgroup_path/1` returns the daemon's cgroup path (or
+    `nil` if the daemon isn't running under a cgroup).
+  * MuonTrap now uses `cgroup.kill` (kernel 5.14+) for atomic cgroup teardown
+    when available, falling back to per-pid SIGKILL on older kernels.
+  * Clear startup error if the v2 unified hierarchy is missing.
+  * Clear error if a requested controller isn't enabled in the parent's
+    `cgroup.subtree_control` (instead of silently running with no limits).
+
 ## v1.8.0
 
 * New feature

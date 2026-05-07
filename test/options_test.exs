@@ -140,28 +140,99 @@ defmodule MuonTrap.OptionsTest do
       delay_to_sigkill: 1,
       stdio_window: 1024,
       env: [{"KEY", "VALUE"}, {"KEY2", "VALUE2"}],
-      cgroup_controllers: ["memory", "cpu"],
       cgroup_base: "base",
-      cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}]
+      cgroup: %{memory_max: 268_435_456, cpu_weight: 50}
     ]
 
     for context <- [:daemon, :cmd] do
       options = Options.validate(context, "echo", [], input)
 
-      assert Map.get(options, :cd) == "path"
-      assert Map.get(options, :arg0) == "arg0"
-      assert Map.get(options, :stderr_to_stdout) == true
-      assert Map.get(options, :capture_stderr_only) == true
-      assert Map.get(options, :parallelism) == true
-      assert Map.get(options, :uid) == 5
-      assert Map.get(options, :gid) == "bill"
-      assert Map.get(options, :delay_to_sigkill) == 1
-      assert Map.get(options, :stdio_window) == 1024
-      assert Map.get(options, :env) == [{~c"KEY", ~c"VALUE"}, {~c"KEY2", ~c"VALUE2"}]
-      assert Map.get(options, :cgroup_controllers) == ["memory", "cpu"]
-      assert Map.get(options, :cgroup_base) == "base"
-      assert Map.get(options, :cgroup_sets) == [{"memory", "memory.limit_in_bytes", "268435456"}]
+      assert options.cd == "path"
+      assert options.arg0 == "arg0"
+      assert options.stderr_to_stdout == true
+      assert options.capture_stderr_only == true
+      assert options.parallelism == true
+      assert options.uid == 5
+      assert options.gid == "bill"
+      assert options.delay_to_sigkill == 1
+      assert options.stdio_window == 1024
+      assert options.env == [{~c"KEY", ~c"VALUE"}, {~c"KEY2", ~c"VALUE2"}]
+      assert options.cgroup_base == "base"
+      assert same_list?(options.cgroup_controllers, ["cpu", "memory"])
+
+      assert same_list?(options.cgroup_sets, [
+               {"memory", "memory.max", "268435456"},
+               {"cpu", "cpu.weight", "50"}
+             ])
     end
+  end
+
+  test "translates a cgroup map with sentinel and tuple values" do
+    options =
+      Options.validate(:daemon, "echo", [],
+        cgroup_path: "muontrap/abc",
+        cgroup: %{
+          memory_max: 500_000_000,
+          memory_high: :max,
+          cpu_max: {50_000, 100_000},
+          memory_oom_group: true
+        }
+      )
+
+    assert options.cgroup_path == "muontrap/abc"
+    assert same_list?(options.cgroup_controllers, ["cpu", "memory"])
+
+    assert same_list?(options.cgroup_sets, [
+             {"memory", "memory.max", "500000000"},
+             {"memory", "memory.high", "max"},
+             {"memory", "memory.oom.group", "1"},
+             {"cpu", "cpu.max", "50000 100000"}
+           ])
+  end
+
+  test "rejects unknown cgroup config keys (including a stale :cgroup_path)" do
+    assert_raise ArgumentError, ~r/unknown cgroup config field/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{bogus_key: 1})
+    end
+
+    assert_raise ArgumentError, ~r/unknown cgroup config field.*cgroup_path/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{cgroup_path: "x"})
+    end
+  end
+
+  test "rejects malformed cgroup values" do
+    assert_raise ArgumentError, ~r/invalid value/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{memory_max: -1})
+    end
+
+    assert_raise ArgumentError, ~r/invalid value/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{cpu_max: {-1, 100}})
+    end
+
+    assert_raise ArgumentError, ~r/invalid value/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{memory_max: "500M"})
+    end
+  end
+
+  test "rejects a :cgroup configuration without a cgroup_path or cgroup_base" do
+    for context <- [:daemon, :cmd] do
+      assert_raise ArgumentError, ~r/requires a :cgroup_path or :cgroup_base/, fn ->
+        Options.validate(context, "echo", [], cgroup: %{memory_max: 268_435_456})
+      end
+    end
+  end
+
+  test "allows a :cgroup configuration with a cgroup_path or cgroup_base" do
+    with_path = Options.validate(:cmd, "echo", [], cgroup: %{memory_max: 1}, cgroup_path: "x")
+    assert with_path.cgroup_path == "x"
+
+    with_base = Options.validate(:cmd, "echo", [], cgroup: %{memory_max: 1}, cgroup_base: "x")
+    assert String.starts_with?(with_base.cgroup_path, "x/")
+  end
+
+  test "an empty :cgroup configuration does not require a path" do
+    options = Options.validate(:cmd, "echo", [], cgroup: %{})
+    refute Map.has_key?(options, :cgroup_path)
   end
 
   test "accepts :groups list of integers and binaries (including empty)" do
@@ -193,4 +264,6 @@ defmodule MuonTrap.OptionsTest do
       Options.validate(:cmd, "echo", [], groups: "audio")
     end
   end
+
+  defp same_list?(a, b), do: Enum.sort(a) == Enum.sort(b)
 end

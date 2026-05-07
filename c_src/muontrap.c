@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -71,8 +72,6 @@ struct controller_var {
 
 struct controller_info {
     const char *name;
-    char *group_path;
-    char *procfile;
 
     struct controller_var *vars;
     struct controller_info *next;
@@ -80,6 +79,8 @@ struct controller_info {
 
 static struct controller_info *controllers = NULL;
 static const char *cgroup_path = NULL;
+static char *full_cgroup_path = NULL;
+static char *cgroup_procs_file = NULL;
 static int brutal_kill_wait_ms = 500;
 static uid_t run_as_uid = 0; // 0 means don't set, since we don't support privilege escalation
 static gid_t run_as_gid = 0; // 0 means don't set, since we don't support privilege escalation
@@ -178,7 +179,8 @@ static int fork_exec(const char *path, char *const *argv)
         // child
 
         // Move to the container
-        move_pid_to_cgroups(getpid());
+        if (cgroup_path)
+            move_pid_to_cgroups(getpid());
 
         if (capture_stderr_only) {
             // Capture stderr only, send stdout to /dev/null
@@ -288,28 +290,98 @@ static int mkdir_p(const char *abspath, int start_index)
 
 static void create_cgroups()
 {
-    FOREACH_CONTROLLER {
-        int start_index = strlen(CGROUP_MOUNT_PATH) + 1 + strlen(controller->name) + 1;
-        INFO("Create cgroup: mkdir -p %s", controller->group_path);
-        if (mkdir_p(controller->group_path, start_index) < 0) {
-            if (errno == EEXIST)
-                FATALX("'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
-                     controller->group_path);
-            else
-                FATAL("Couldn't create '%s'. Check permissions.", controller->group_path);
-        }
+    int start_index = strlen(CGROUP_MOUNT_PATH) + 1;
+    INFO("Create cgroup: mkdir -p %s", full_cgroup_path);
+    if (mkdir_p(full_cgroup_path, start_index) < 0) {
+        if (errno == EEXIST)
+            FATALX("'%s' already exists. Please specify a deeper group_path or clean up the cgroup",
+                 full_cgroup_path);
+        else
+            FATAL("Couldn't create '%s'. Check permissions.", full_cgroup_path);
     }
 }
 
-static int write_file(const char *group_path, const char *value)
+static int write_file(const char *path, const char *value)
 {
-   FILE *fp = fopen(group_path, "w");
+   FILE *fp = fopen(path, "w");
    if (!fp)
        return -1;
 
    int rc = fwrite(value, 1, strlen(value), fp);
    fclose(fp);
    return rc;
+}
+
+static int controller_listed(const char *buf, const char *name)
+{
+    size_t name_len = strlen(name);
+    const char *p = buf;
+    while ((p = strstr(p, name)) != NULL) {
+        int prev_ok = (p == buf || isspace((unsigned char) p[-1]));
+        int next_ok = (p[name_len] == 0 || isspace((unsigned char) p[name_len]));
+        if (prev_ok && next_ok)
+            return 1;
+        p++;
+    }
+    return 0;
+}
+
+static void enable_controllers()
+{
+    // In cgroup v2, controllers must be enabled in the parent cgroup's
+    // subtree_control before they're available to children. Best-effort:
+    // failures here are silently ignored because the parent's subtree_control
+    // may already be set up by systemd or root, and writing to it may not be
+    // permitted. verify_controllers_available() below catches the real
+    // failure case (controller not present in our cgroup.controllers).
+    char *parent_path = strdup(full_cgroup_path);
+    char *last_slash = strrchr(parent_path, '/');
+    if (!last_slash || last_slash == parent_path) {
+        free(parent_path);
+        return;
+    }
+    *last_slash = '\0';
+
+    char *subtree_control_file;
+    checked_asprintf(&subtree_control_file, "%s/cgroup.subtree_control", parent_path);
+
+    FOREACH_CONTROLLER {
+        char *enable_str;
+        checked_asprintf(&enable_str, "+%s", controller->name);
+        INFO("Enable controller: echo '%s' > %s", enable_str, subtree_control_file);
+        (void) write_file(subtree_control_file, enable_str);
+        free(enable_str);
+    }
+
+    free(subtree_control_file);
+    free(parent_path);
+}
+
+static void verify_controllers_available()
+{
+    char *controllers_file;
+    checked_asprintf(&controllers_file, "%s/cgroup.controllers", full_cgroup_path);
+
+    FILE *fp = fopen(controllers_file, "r");
+    if (!fp)
+        FATAL("Can't read '%s'", controllers_file);
+
+    char buf[1024];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
+    buf[n] = 0;
+    fclose(fp);
+
+    FOREACH_CONTROLLER {
+        if (!controller_listed(buf, controller->name)) {
+            FATALX("Controller '%s' is not available in '%s'.\n"
+                   "Enable it in the parent cgroup's cgroup.subtree_control. "
+                   "This usually requires root, e.g.:\n"
+                   "  echo +%s | sudo tee %s/cgroup.subtree_control",
+                   controller->name, full_cgroup_path,
+                   controller->name, CGROUP_MOUNT_PATH);
+        }
+    }
+    free(controllers_file);
 }
 
 static void update_cgroup_settings()
@@ -319,7 +391,7 @@ static void update_cgroup_settings()
              var != NULL;
              var = var->next) {
             char *setting_file;
-            checked_asprintf(&setting_file, "%s/%s", controller->group_path, var->key);
+            checked_asprintf(&setting_file, "%s/%s", full_cgroup_path, var->key);
             if (write_file(setting_file, var->value) < 0)
                 FATAL("Error writing '%s' to '%s'", var->value, setting_file);
             free(setting_file);
@@ -329,25 +401,21 @@ static void update_cgroup_settings()
 
 static void move_pid_to_cgroups(pid_t pid)
 {
-    FOREACH_CONTROLLER {
-        FILE *fp = fopen(controller->procfile, "w");
-        if (fp == NULL ||
-            fprintf(fp, "%d", pid) < 0)
-            FATAL("Can't add pid to %s", controller->procfile);
-        fclose(fp);
-    }
+    FILE *fp = fopen(cgroup_procs_file, "w");
+    if (fp == NULL ||
+        fprintf(fp, "%d", pid) < 0)
+        FATAL("Can't add pid to %s", cgroup_procs_file);
+    fclose(fp);
 }
 
 static void destroy_cgroups()
 {
-    FOREACH_CONTROLLER {
-        // Only remove the final directory, since we don't keep track of
-        // what we actually create.
-        INFO("rmdir %s", controller->group_path);
-        if (rmdir(controller->group_path) < 0) {
-            INFO("Error removing %s (%s)", controller->group_path, strerror(errno));
-            WARN("Error removing %s", controller->group_path);
-        }
+    // Only remove the final directory, since we don't keep track of
+    // what we actually create.
+    INFO("rmdir %s", full_cgroup_path);
+    if (rmdir(full_cgroup_path) < 0) {
+        INFO("Error removing %s (%s)", full_cgroup_path, strerror(errno));
+        WARN("Error removing %s", full_cgroup_path);
     }
 }
 
@@ -371,12 +439,29 @@ static int procfile_killall(const char *group_path, int sig)
 
 static int kill_children(int sig)
 {
-    int children_killed = 0;
-    FOREACH_CONTROLLER {
-        INFO("killall -%d from %s", sig, controller->procfile);
-        children_killed += procfile_killall(controller->procfile, sig);
-    }
-    return children_killed;
+    INFO("killall -%d from %s", sig, cgroup_procs_file);
+    return procfile_killall(cgroup_procs_file, sig);
+}
+
+// Atomic kill via cgroup.kill (kernel 5.14+, 2021). On success, the kernel
+// sends SIGKILL to every process in the cgroup in one shot. Returns 0 on
+// success, -1 if cgroup.kill is unavailable (older kernel, no cgroup_path,
+// or write failed). Caller falls back to per-pid signaling.
+static int try_cgroup_kill()
+{
+    if (!full_cgroup_path)
+        return -1;
+
+    char *kill_file;
+    checked_asprintf(&kill_file, "%s/cgroup.kill", full_cgroup_path);
+    int rc = write_file(kill_file, "1");
+    free(kill_file);
+
+    if (rc < 0)
+        return -1;
+
+    INFO("cgroup.kill triggered");
+    return 0;
 }
 
 #ifdef DEBUG
@@ -421,18 +506,25 @@ static void procfile_dump_children(const char *group_path)
 
 static void dump_all_children_from_cgroups()
 {
-    FOREACH_CONTROLLER {
-        procfile_dump_children(controller->procfile);
-    }
+    if (cgroup_procs_file)
+        procfile_dump_children(cgroup_procs_file);
 }
 #endif
 
 static void finish_controller_init()
 {
-    FOREACH_CONTROLLER {
-        checked_asprintf(&controller->group_path, "%s/%s/%s", CGROUP_MOUNT_PATH, controller->name, cgroup_path);
-        checked_asprintf(&controller->procfile, "%s/cgroup.procs", controller->group_path);
+    // Verify cgroup v2 unified hierarchy is present.
+    char *root_controllers;
+    checked_asprintf(&root_controllers, "%s/cgroup.controllers", CGROUP_MOUNT_PATH);
+    if (access(root_controllers, R_OK) < 0) {
+        FATALX("cgroup v2 unified hierarchy not detected at %s.\n"
+               "MuonTrap requires cgroup v2. See the MuonTrap docs for setup.",
+               CGROUP_MOUNT_PATH);
     }
+    free(root_controllers);
+
+    checked_asprintf(&full_cgroup_path, "%s/%s", CGROUP_MOUNT_PATH, cgroup_path);
+    checked_asprintf(&cgroup_procs_file, "%s/cgroup.procs", full_cgroup_path);
 }
 
 static int wait_for_sigchld(pid_t pid_to_match, int timeout_ms)
@@ -500,7 +592,12 @@ static void cleanup_all_children()
     // I.e., Their parent is now PID 1 and we won't get a SIGCHLD when
     // they die. We only know who they are since they're in the cgroup.
 
-    // Send every child a SIGKILL
+    // Prefer cgroup.kill (kernel 5.14+) for atomic kill of the whole cgroup.
+    // Falls back to per-pid SIGKILL on older kernels. The per-pid kill loop
+    // below also serves to wait for processes to actually exit before rmdir.
+    (void) try_cgroup_kill();
+
+    // Send every child a SIGKILL (no-op if cgroup.kill already did it)
     int children_left = kill_children(SIGKILL);
     if (children_left > 0) {
         INFO("Found %d pids and sent them a SIGKILL", children_left);
@@ -557,7 +654,6 @@ static struct controller_info *add_controller(const char *name)
 
     struct controller_info *new_controller = malloc(sizeof(struct controller_info));
     new_controller->name = name;
-    new_controller->group_path = NULL;
     new_controller->vars = NULL;
     new_controller->next = controllers;
     controllers = new_controller;
@@ -919,7 +1015,8 @@ int main(int argc, char *argv[])
     if (cgroup_path && !controllers)
         FATALX("Specify a cgroup controller (-c) if you specify a group_path");
 
-    finish_controller_init();
+    if (cgroup_path)
+        finish_controller_init();
 
     // Finished processing commandline. Initialize and run child.
 
@@ -954,9 +1051,12 @@ int main(int argc, char *argv[])
 
     enable_signal_handlers();
 
-    create_cgroups();
-
-    update_cgroup_settings();
+    if (cgroup_path) {
+        create_cgroups();
+        enable_controllers();
+        verify_controllers_available();
+        update_cgroup_settings();
+    }
 
     const char *program_name = argv[optind];
     if (argv0)
@@ -972,9 +1072,10 @@ int main(int argc, char *argv[])
     }
 
     // Cleanup all descendents if using cgroups
-    cleanup_all_children();
-
-    destroy_cgroups();
+    if (cgroup_path) {
+        cleanup_all_children();
+        destroy_cgroups();
+    }
     disable_signal_handlers();
 
     exit(exit_status);

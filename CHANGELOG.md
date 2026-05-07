@@ -5,6 +5,53 @@
 
 # Changelog
 
+## v2.0.0-rc.0
+
+This release drops cgroup v1 support. cgroup v2 is the default on every
+mainstream Linux distribution since 2021–2022 and is supported by Nerves.
+
+If you don't use cgroups, this update is not breaking for you. Library authors
+are encouraged to allow both MuonTrap v1 and v2 to be used if your library falls
+into this category.
+
+* Breaking changes
+  * Cgroup v1 support removed
+  * `:cgroup_controllers` and `:cgroup_sets` options replaced by a single
+    `:cgroup` configuration map
+  * `MuonTrap.Daemon.cgget/cgset` API changed for v2. They've been
+    de-emphasized for configuration due to their low-level nature
+
+* New features
+  * Add new `:cgroup` configuration option as a more Elixir-friendly
+    configuration method
+  * `MuonTrap.Daemon.cgroup_config/1` returns the daemon's writable cgroup
+    settings as a map keyed by the same atoms accepted by the `:cgroup`
+    option, suitable for round-tripping into another daemon.
+  * `MuonTrap.Daemon.statistics/1` now also returns cgroup statistics as a map
+    under the `:cgroup` key. Map keys are strings that match cgroup file names
+    exposed by the kernel (memory usage and peak, CPU and memory PSI,
+    OOM-kill counts, `pids.current`, etc.).
+  * `MuonTrap.Daemon.cgroup_path/1` returns the daemon's cgroup path (or
+    `nil` if the daemon isn't running under a cgroup).
+  * MuonTrap now uses `cgroup.kill` (kernel 5.14+) for atomic cgroup teardown
+    when available, falling back to per-pid SIGKILL on older kernels.
+
+The new configuration gives a feel for how the API has changed to reduce
+manual string-based interactions:
+
+```elixir
+cgroup_controllers: ["memory", "cpu"],
+cgroup_sets: [
+  {"memory", "memory.max", "268435456"},
+  {"cpu", "cpu.max", "50000 100000"}
+]
+
+cgroup: %{
+  memory_max: 256*1024*1024,
+  cpu_max: {50_000, 100_000}
+}
+```
+
 ## v1.8.0
 
 * New feature

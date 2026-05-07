@@ -66,18 +66,27 @@ defmodule CgroupTest do
     port =
       Port.open(
         {:spawn_executable, MuonTrap.muontrap_path()},
-        args: ["-g", cgroup_path, "-c", "memory", "./test/do_nothing.test"]
+        args: [
+          "-g",
+          cgroup_path,
+          "-c",
+          "memory",
+          "-s",
+          "memory.max=268435456",
+          "./test/do_nothing.test"
+        ]
       )
 
     os_pid = os_pid(port)
     assert_os_pid_running(os_pid)
     assert memory_cgroup_exists(cgroup_path)
 
-    {:ok, memory_str} = Cgroups.cgget("memory", cgroup_path, "memory.limit_in_bytes")
-    {memory, _} = Integer.parse(memory_str)
-    assert memory > 1000
+    {:ok, memory_str} = Cgroups.cgget(cgroup_path, "memory.max")
+    assert String.to_integer(String.trim(memory_str)) == 268_435_456
 
-    # :ok = Cgroups.cgset("memory", cgroup_path, "memory.limit_in_bytes", "900")
+    :ok = Cgroups.cgset(cgroup_path, "memory.max", "536870912")
+    {:ok, memory_str} = Cgroups.cgget(cgroup_path, "memory.max")
+    assert String.to_integer(String.trim(memory_str)) == 536_870_912
 
     Port.close(port)
   end

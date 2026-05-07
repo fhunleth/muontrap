@@ -8,17 +8,20 @@ ExUnit.start()
 defmodule MuonTrapTestHelpers do
   @spec check_cgroup_support() :: :ok | no_return()
   def check_cgroup_support() do
-    if !System.find_executable("cgget") do
-      IO.puts(:stderr, "\nPlease install cgroup-tools so that cgcreate and cgget are available.")
-      IO.puts(:stderr, "\nTo skip cgroup tests, run `mix test --exclude cgroup`")
-      System.halt(1)
-    end
-
     if !(MuonTrapTest.Case.cpu_cgroup_exists("muontrap_test") and
            MuonTrapTest.Case.memory_cgroup_exists("muontrap_test")) do
-      IO.puts(:stderr, "\nPlease create the muontrap_test cgroup")
-      IO.puts(:stderr, "sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test")
-      IO.puts(:stderr, "\nTo skip cgroup tests, run `mix test --exclude cgroup`")
+      IO.puts(:stderr, """
+
+      Please create the muontrap_test cgroup with cpu and memory enabled. Roughly:
+
+        sudo mkdir -p /sys/fs/cgroup/muontrap_test
+        sudo chown -R $(whoami) /sys/fs/cgroup/muontrap_test
+        # Ensure cpu and memory are enabled in the parent's subtree_control. Run as root:
+        echo +cpu +memory | sudo tee /sys/fs/cgroup/cgroup.subtree_control
+
+      To skip cgroup tests, run `mix test --exclude cgroup`
+      """)
+
       System.halt(1)
     end
   end

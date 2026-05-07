@@ -27,26 +27,37 @@ defmodule MuonTrap do
 
   ## Configuring cgroups
 
-  On most Linux distributions, use `cgcreate` to create a new cgroup.  You can
-  name them almost anything. The command below creates one named `muontrap` for
-  the current user. It supports memory and CPU controls.
+  MuonTrap uses cgroup v2 (the unified hierarchy at `/sys/fs/cgroup`). It does
+  not support cgroup v1. v2 is the default on every mainstream distribution
+  since 2021–2022 (Ubuntu 22.04+, Debian 11+, RHEL 9+, recent Nerves systems).
 
-  ```sh
-  sudo cgcreate -a $(whoami) -g memory,cpu:muontrap
-  ```
+  Two pieces of setup are needed at some point before MuonTrap uses a cgroup
+  — there's no need to do them at boot, just before the first cgroup-using
+  call:
 
-  Nerves systems do not contain `cgcreate` by default. Due to the simpler Linux
-  setup, it may be sufficient to run `File.mkdir_p(cgroup_path)` to create a
-  cgroup. For example:
+    1. The controllers you want (e.g., `cpu`, `memory`, `pids`) must be
+       enabled in the *root* cgroup's `cgroup.subtree_control`. On systemd
+       hosts this is managed for you via slices. Otherwise:
 
-  ```elixir
-  File.mkdir_p("/sys/fs/cgroup/memory/muontrap")
-  ```
+       ```sh
+       echo +cpu +memory +pids | sudo tee /sys/fs/cgroup/cgroup.subtree_control
+       ```
 
-  This creates the cgroup path, `muontrap` under the `memory` controller.  If
-  you do not have the `"/sys/fs/cgroup"` directory, you will need to mount it
-  or update your `erlinit.config` to mount it for you. See a newer official
-  system for an example.
+    2. A parent cgroup directory you can write to. MuonTrap creates a
+       sub-cgroup underneath it for each spawned process. For example:
+
+       ```sh
+       sudo mkdir -p /sys/fs/cgroup/muontrap
+       sudo chown -R $(whoami) /sys/fs/cgroup/muontrap
+       ```
+
+  On Nerves, where the BEAM runs as root, both steps can run from your
+  application's start callback (or any helper module) the first time you
+  need cgroups. Pass the parent's name (here, `"muontrap"`) as
+  `:cgroup_base`.
+
+  See the project README for worked examples (capping CPU and memory, fork-bomb
+  protection, sandboxing with bwrap) and pointers to the kernel cgroup v2 docs.
   """
 
   @doc ~S"""
@@ -54,10 +65,15 @@ defmodule MuonTrap do
 
   ## Options
 
-    * `:cgroup_controllers` - run the command under the specified cgroup controllers. Defaults to `[]`.
+    * `:cgroup` - a map of cgroup v2 settings to apply (e.g.
+      `%{cpu_weight: 50, memory_max: 500_000_000, pids_max: 256}`). Keys
+      mirror the cgroup v2 interface file names with `.` replaced by `_`.
+      Controllers are enabled automatically based on which keys are
+      present. See `MuonTrap.Daemon.cgroup_config/1` for the supported
+      keys and value shapes; pass the map it returns to start a new
+      daemon with the same settings.
     * `:cgroup_base` - create a temporary path under the specified cgroup path
     * `:cgroup_path` - explicitly specify a path to use. Use `:cgroup_base`, unless you must control the path.
-    * `:cgroup_sets` - set a cgroup controller parameter before running the command
     * `:delay_to_sigkill` - milliseconds before sending a SIGKILL to a child process if it doesn't exit with a SIGTERM (default 500 ms)
     * `:uid` - run the command using the specified uid or username. When a
       username is given, supplementary groups are loaded from `/etc/group`.
@@ -95,17 +111,20 @@ defmodule MuonTrap do
   {"hello\n", 0}
   ```
 
-  The next examples only run on Linux. To try this out, create new cgroups:
+  The next examples only run on Linux. To try this out, create a parent
+  cgroup and ensure cpu/memory are enabled in the root subtree (see the
+  `Configuring cgroups` section above):
 
   ```sh
-  sudo cgcreate -a $(whoami) -g memory,cpu:muontrap
+  sudo mkdir -p /sys/fs/cgroup/muontrap
+  sudo chown -R $(whoami) /sys/fs/cgroup/muontrap
   ```
 
-  Run a command, but limit memory so severely that it doesn't work (for demo
-  purposes, obviously):
+  Run a command, but limit memory so severely that it can't allocate (for
+  demo purposes, obviously):
 
   ```elixir
-  iex-donttest> MuonTrap.cmd("echo", ["hello"], cgroup_controllers: ["memory"], cgroup_path: "muontrap/test", cgroup_sets: [{"memory", "memory.limit_in_bytes", "8192"}])
+  iex-donttest> MuonTrap.cmd("echo", ["hello"], cgroup_path: "muontrap/test", cgroup: %{memory_max: 1_048_576})
   {"", 1}
   ```
 

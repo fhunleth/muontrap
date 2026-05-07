@@ -38,11 +38,10 @@ defmodule MuonTrap.Options do
   * `:stdio_window`
   * `:exit_status_to_reason` - `MuonTrap.Daemon`-only
   * `:wait_for` - `MuonTrap.Daemon`-only
-  * `:cgroup_controllers`
+  * `:cgroup`
   * `:cgroup_path`
   * `:cgroup_base`
   * `:delay_to_sigkill`
-  * `:cgroup_sets`
   * `:uid`
   * `:gid`
   * `:groups`
@@ -73,6 +72,7 @@ defmodule MuonTrap.Options do
 
     validate_options(context, abs_command, args, opts)
     |> resolve_cgroup_path()
+    |> validate_cgroup_has_path()
   end
 
   defp resolve_cgroup_path(%{cgroup_path: _path, cgroup_base: _base}) do
@@ -85,6 +85,17 @@ defmodule MuonTrap.Options do
   end
 
   defp resolve_cgroup_path(other), do: other
+
+  # A :cgroup configuration is silently ignored by the port unless there's a
+  # cgroup path to apply it to, so reject it up front rather than running the
+  # command with none of the requested limits.
+  defp validate_cgroup_has_path(%{cgroup_path: _path} = options), do: options
+
+  defp validate_cgroup_has_path(%{cgroup_controllers: [_ | _]}) do
+    raise ArgumentError, "a :cgroup configuration requires a :cgroup_path or :cgroup_base"
+  end
+
+  defp validate_cgroup_has_path(other), do: other
 
   # Thanks https://github.com/danhper/elixir-temp/blob/master/lib/temp.ex
   defp random_string() do
@@ -171,8 +182,13 @@ defmodule MuonTrap.Options do
       )
 
   # MuonTrap common options
-  defp validate_option(_any, {:cgroup_controllers, controllers}, opts) when is_list(controllers),
-    do: Map.put(opts, :cgroup_controllers, controllers)
+  defp validate_option(_any, {:cgroup, config}, opts) when is_map(config) do
+    {controllers, sets} = MuonTrap.Cgroups.translate_config(config)
+
+    opts
+    |> Map.put(:cgroup_controllers, controllers)
+    |> Map.put(:cgroup_sets, sets)
+  end
 
   defp validate_option(_any, {:cgroup_path, path}, opts) when is_binary(path) do
     Map.put(opts, :cgroup_path, path)
@@ -184,9 +200,6 @@ defmodule MuonTrap.Options do
 
   defp validate_option(_any, {:delay_to_sigkill, delay}, opts) when is_integer(delay),
     do: Map.put(opts, :delay_to_sigkill, delay)
-
-  defp validate_option(_any, {:cgroup_sets, sets}, opts) when is_list(sets),
-    do: Map.put(opts, :cgroup_sets, sets)
 
   defp validate_option(_any, {:uid, id}, opts) when is_integer(id) or is_binary(id),
     do: Map.put(opts, :uid, id)

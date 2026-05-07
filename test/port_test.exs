@@ -46,14 +46,14 @@ defmodule MuonTrapPortTest do
   end
 
   test "handles cgroup sets" do
-    options = %{cmd: "/bin/echo", args: [], cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}]}
+    options = %{cmd: "/bin/echo", args: [], cgroup_sets: [{"cpu", "cpu.max", "50000 100000"}]}
     port_options = MuonTrap.Port.port_options(options)
 
     assert Keyword.get(port_options, :args) == [
              "--controller",
              "cpu",
              "--set",
-             "cpu.cfs_period_us=100000",
+             "cpu.max=50000 100000",
              "--",
              "/bin/echo"
            ]
@@ -63,7 +63,10 @@ defmodule MuonTrapPortTest do
     options = %{
       cmd: "/bin/echo",
       args: [],
-      cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}, {"cpu", "cpu.cfs_quota_us", "50000"}]
+      cgroup_sets: [
+        {"cpu", "cpu.max", "50000 100000"},
+        {"memory", "memory.max", "268435456"}
+      ]
     }
 
     port_options = MuonTrap.Port.port_options(options)
@@ -72,11 +75,11 @@ defmodule MuonTrapPortTest do
              "--controller",
              "cpu",
              "--set",
-             "cpu.cfs_period_us=100000",
+             "cpu.max=50000 100000",
              "--controller",
-             "cpu",
+             "memory",
              "--set",
-             "cpu.cfs_quota_us=50000",
+             "memory.max=268435456",
              "--",
              "/bin/echo"
            ]

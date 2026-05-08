@@ -392,18 +392,23 @@ defmodule DaemonTest do
   end
 
   test "returns :error_exit_status for stop reason" do
-    {:ok, pid} = start_supervised(daemon_spec(test_path("kill_self_with_sigusr1.test"), []))
+    log =
+      capture_log(fn ->
+        {:ok, pid} = start_supervised(daemon_spec(test_path("kill_self_with_sigusr1.test"), []))
 
-    ref = Process.monitor(pid)
+        ref = Process.monitor(pid)
 
-    os_pid = Daemon.os_pid(pid)
+        os_pid = Daemon.os_pid(pid)
 
-    assert_receive {:DOWN, ^ref, :process, _object, :error_exit_status}
-    assert_os_pid_exited(os_pid)
+        assert_receive {:DOWN, ^ref, :process, _object, :error_exit_status}
+        assert_os_pid_exited(os_pid)
 
-    :ok = stop_supervised(:test_daemon)
+        :ok = stop_supervised(:test_daemon)
 
-    wait_for_close_check()
+        wait_for_close_check()
+      end)
+
+    assert log =~ "Process exited with status"
   end
 
   test "supports mapping exit status to stop reason" do
@@ -412,29 +417,34 @@ defmodule DaemonTest do
     # signal mapping to decide which one to expect
     sigusr1 = s2n("USR1", 10)
 
-    {:ok, pid} =
-      start_supervised(
-        daemon_spec(test_path("kill_self_with_sigusr1.test"), [],
-          exit_status_to_reason: fn s ->
-            if s == 128 + sigusr1 do
-              :error_exit_sigusr1
-            else
-              {:error_exit_status, s}
-            end
-          end
-        )
-      )
+    log =
+      capture_log(fn ->
+        {:ok, pid} =
+          start_supervised(
+            daemon_spec(test_path("kill_self_with_sigusr1.test"), [],
+              exit_status_to_reason: fn s ->
+                if s == 128 + sigusr1 do
+                  :error_exit_sigusr1
+                else
+                  {:error_exit_status, s}
+                end
+              end
+            )
+          )
 
-    ref = Process.monitor(pid)
+        ref = Process.monitor(pid)
 
-    os_pid = Daemon.os_pid(pid)
+        os_pid = Daemon.os_pid(pid)
 
-    assert_receive {:DOWN, ^ref, :process, _object, :error_exit_sigusr1}
-    assert_os_pid_exited(os_pid)
+        assert_receive {:DOWN, ^ref, :process, _object, :error_exit_sigusr1}
+        assert_os_pid_exited(os_pid)
 
-    :ok = stop_supervised(:test_daemon)
+        :ok = stop_supervised(:test_daemon)
 
-    wait_for_close_check()
+        wait_for_close_check()
+      end)
+
+    assert log =~ "Process exited with status"
   end
 
   defp s2n(name, default) do
@@ -667,10 +677,15 @@ defmodule DaemonTest do
   test "wait_for raising crashes the daemon via the link" do
     Process.flag(:trap_exit, true)
 
-    {:ok, pid} =
-      Daemon.start_link(test_path("do_nothing.test"), [], wait_for: fn -> raise "boom" end)
+    log =
+      capture_log(fn ->
+        {:ok, pid} =
+          Daemon.start_link(test_path("do_nothing.test"), [], wait_for: fn -> raise "boom" end)
 
-    assert_receive {:EXIT, ^pid, {%RuntimeError{message: "boom"}, _}}, 1000
+        assert_receive {:EXIT, ^pid, {%RuntimeError{message: "boom"}, _}}, 1000
+      end)
+
+    assert log =~ "boom"
   end
 
   test "stopping the daemon while wait_for is still running terminates the wait task" do

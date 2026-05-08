@@ -22,6 +22,7 @@ static void do_fork(int left)
             do_fork(left - 1);
             // Hang out long enough to satisfy the tests
             sleep(120);
+            _exit(0);
         }
         printf("%d\n", pid);
         fflush(stdout);

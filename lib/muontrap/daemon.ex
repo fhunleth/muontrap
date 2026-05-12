@@ -257,6 +257,8 @@ defmodule MuonTrap.Daemon do
       wait_task: nil
     }
 
+    Process.flag(:trap_exit, true)
+
     case Map.get(options, :wait_for) do
       nil -> {:ok, start_port(state)}
       fun -> {:ok, %{state | wait_task: Task.async(fun)}}
@@ -385,6 +387,27 @@ defmodule MuonTrap.Daemon do
           state.exit_status_to_reason.(status)
       end
 
+    {:stop, reason, state}
+  end
+
+  # Port closed cleanly: the :exit_status path stops us. Ignore the link signal
+  # that follows so it doesn't kill the GenServer before exit_status is handled.
+  def handle_info({:EXIT, port, :normal}, %__MODULE__{port: port} = state) do
+    {:noreply, state}
+  end
+
+  # Port died abnormally (e.g., :epipe when a Port.command races with the
+  # external program exiting). No :exit_status will arrive, so stop with the
+  # port's reason and let the supervisor restart us.
+  def handle_info({:EXIT, port, reason}, %__MODULE__{port: port} = state) do
+    {:stop, reason, state}
+  end
+
+  def handle_info({:EXIT, _from, :normal}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:EXIT, _from, reason}, state) do
     {:stop, reason, state}
   end
 

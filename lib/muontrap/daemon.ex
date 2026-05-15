@@ -114,20 +114,78 @@ defmodule MuonTrap.Daemon do
   end
 
   @doc """
-  Get the value of the specified cgroup variable.
+  Read a cgroup v2 interface file from the daemon's cgroup.
+
+  `variable_name` is a v2 interface file like `"memory.current"` or
+  `"cpu.stat"`. See `man 7 cgroups` and the kernel's
+  `Documentation/admin-guide/cgroup-v2.rst` for the full list.
+
+  Returns `{:error, :no_cgroup}` if the daemon wasn't started under a
+  cgroup.
   """
-  @spec cgget(GenServer.server(), binary(), binary()) ::
-          {:ok, String.t()} | {:error, File.posix()}
-  def cgget(server, controller, variable_name) do
-    GenServer.call(server, {:cgget, controller, variable_name})
+  @spec cgget(GenServer.server(), binary()) ::
+          {:ok, String.t()} | {:error, File.posix() | :no_cgroup}
+  def cgget(server, variable_name) do
+    GenServer.call(server, {:cgget, variable_name})
   end
 
   @doc """
-  Modify a cgroup variable.
+  Write a value to a cgroup v2 interface file in the daemon's cgroup.
+
+  Returns `{:error, :no_cgroup}` if the daemon wasn't started under a
+  cgroup.
   """
-  @spec cgset(GenServer.server(), binary(), binary(), binary()) :: :ok | {:error, File.posix()}
-  def cgset(server, controller, variable_name, value) do
-    GenServer.call(server, {:cgset, controller, variable_name, value})
+  @spec cgset(GenServer.server(), binary(), binary()) ::
+          :ok | {:error, File.posix() | :no_cgroup}
+  def cgset(server, variable_name, value) do
+    GenServer.call(server, {:cgset, variable_name, value})
+  end
+
+  @doc """
+  Return the daemon's writable cgroup settings as a flat map.
+
+  Keys mirror the cgroup v2 interface file names with `.` replaced by
+  `_` (e.g. `cpu.weight` → `:cpu_weight`, `memory.swap.max` →
+  `:memory_swap_max`). Files that aren't present (controller not
+  enabled, knob not in this kernel) are omitted. Returns an empty map
+  if the daemon isn't running under a cgroup.
+
+  The returned map is accepted as the `:cgroup` option on
+  `start_link/3`/`MuonTrap.cmd/3`, so you can read one daemon's
+  settings and start another with the same configuration under a fresh
+  `cgroup_path` (or `cgroup_base`).
+
+  Possible keys:
+
+  * `:cpu_weight` - integer 1..10000 (default 100)
+  * `:cpu_max` - `:max` or `{quota_us, period_us}`
+  * `:cpu_idle` - boolean
+  * `:memory_min`, `:memory_low` - bytes
+  * `:memory_high`, `:memory_max`, `:memory_swap_max` - bytes or `:max`
+  * `:memory_oom_group` - boolean
+  * `:pids_max` - count or `:max`
+  * `:io_weight` - integer 1..10000
+  * `:cpuset_cpus`, `:cpuset_mems` - range strings (e.g. `"0-3,5"`)
+
+  See `cgroup_path/1` to retrieve the cgroup path itself, and
+  `statistics/1` for the read-only stat files.
+  """
+  @spec cgroup_config(GenServer.server()) :: %{optional(atom()) => term()}
+  def cgroup_config(server) do
+    GenServer.call(server, :cgroup_config)
+  end
+
+  @doc """
+  Return the daemon's cgroup path, or `nil` if the daemon isn't
+  running under a cgroup.
+
+  Paths are relative to `/sys/fs/cgroup`. For example, a daemon
+  started with `cgroup_base: "muontrap"` might return
+  `"muontrap/a1b2c3"`.
+  """
+  @spec cgroup_path(GenServer.server()) :: String.t() | nil
+  def cgroup_path(server) do
+    GenServer.call(server, :cgroup_path)
   end
 
   @doc """
@@ -139,13 +197,38 @@ defmodule MuonTrap.Daemon do
   end
 
   @doc """
-  Return statistics about the daemon
+  Return statistics about the daemon.
 
-  Statistics:
+  The following key is always present:
 
   * `:output_byte_count` - bytes output by the process being run
+
+  When the daemon is running under a cgroup, the corresponding v2 interface
+  files are read on each call and merged in. Files that don't exist (e.g.,
+  the controller isn't enabled, or PSI isn't compiled into the kernel) are
+  omitted rather than reported as errors.
+
+  Possible cgroup keys:
+
+  * `:memory_current`, `:memory_peak`, `:memory_swap_current` - bytes
+  * `:memory_events` - flat-keyed map (`:low`, `:high`, `:max`, `:oom`,
+    `:oom_kill`, ...)
+  * `:memory_pressure`, `:cpu_pressure`, `:io_pressure` - PSI maps shaped
+    like `%{some: %{avg10: 0.0, avg60: 0.0, avg300: 0.0, total: 0}, full: %{...}}`
+  * `:cpu_stat` - flat-keyed map (`:usage_usec`, `:user_usec`, `:system_usec`,
+    plus `:nr_periods`, `:nr_throttled`, `:throttled_usec` when `cpu.max` is set)
+  * `:pids_current`, `:pids_peak` - counts
+  * `:pids_events` - flat-keyed map (e.g. `:max`)
+  * `:cgroup_stat` - flat-keyed map with `:nr_descendants`,
+    `:nr_dying_descendants`
+
+  See the kernel's `Documentation/admin-guide/cgroup-v2.rst` for the full
+  semantics of each file.
   """
-  @spec statistics(GenServer.server()) :: %{output_byte_count: non_neg_integer()}
+  @spec statistics(GenServer.server()) :: %{
+          :output_byte_count => non_neg_integer(),
+          optional(atom()) => term()
+        }
   def statistics(server) do
     GenServer.call(server, :statistics)
   end
@@ -173,6 +256,8 @@ defmodule MuonTrap.Daemon do
       output_byte_count: 0,
       wait_task: nil
     }
+
+    Process.flag(:trap_exit, true)
 
     case Map.get(options, :wait_for) do
       nil -> {:ok, start_port(state)}
@@ -220,20 +305,36 @@ defmodule MuonTrap.Daemon do
   end
 
   @impl GenServer
-  def handle_call({:cgget, controller, variable_name}, _from, %{cgroup_path: cgroup_path} = state) do
-    result = Cgroups.cgget(controller, cgroup_path, variable_name)
+  def handle_call({:cgget, _variable_name}, _from, %{cgroup_path: nil} = state) do
+    {:reply, {:error, :no_cgroup}, state}
+  end
+
+  def handle_call({:cgget, variable_name}, _from, %{cgroup_path: cgroup_path} = state) do
+    result = Cgroups.cgget(cgroup_path, variable_name)
 
     {:reply, result, state}
   end
 
+  def handle_call({:cgset, _variable_name, _value}, _from, %{cgroup_path: nil} = state) do
+    {:reply, {:error, :no_cgroup}, state}
+  end
+
   def handle_call(
-        {:cgset, controller, variable_name, value},
+        {:cgset, variable_name, value},
         _from,
         %{cgroup_path: cgroup_path} = state
       ) do
-    result = Cgroups.cgset(controller, cgroup_path, variable_name, value)
+    result = Cgroups.cgset(cgroup_path, variable_name, value)
 
     {:reply, result, state}
+  end
+
+  def handle_call(:cgroup_config, _from, %{cgroup_path: cgroup_path} = state) do
+    {:reply, Cgroups.config(cgroup_path), state}
+  end
+
+  def handle_call(:cgroup_path, _from, %{cgroup_path: cgroup_path} = state) do
+    {:reply, cgroup_path, state}
   end
 
   def handle_call(:os_pid, _from, %__MODULE__{port: nil} = state) do
@@ -251,7 +352,11 @@ defmodule MuonTrap.Daemon do
   end
 
   def handle_call(:statistics, _from, state) do
-    statistics = %{output_byte_count: state.output_byte_count}
+    statistics =
+      state.cgroup_path
+      |> Cgroups.statistics()
+      |> Map.put(:output_byte_count, state.output_byte_count)
+
     {:reply, statistics, state}
   end
 
@@ -282,6 +387,27 @@ defmodule MuonTrap.Daemon do
           state.exit_status_to_reason.(status)
       end
 
+    {:stop, reason, state}
+  end
+
+  # Port closed cleanly: the :exit_status path stops us. Ignore the link signal
+  # that follows so it doesn't kill the GenServer before exit_status is handled.
+  def handle_info({:EXIT, port, :normal}, %__MODULE__{port: port} = state) do
+    {:noreply, state}
+  end
+
+  # Port died abnormally (e.g., :epipe when a Port.command races with the
+  # external program exiting). No :exit_status will arrive, so stop with the
+  # port's reason and let the supervisor restart us.
+  def handle_info({:EXIT, port, reason}, %__MODULE__{port: port} = state) do
+    {:stop, reason, state}
+  end
+
+  def handle_info({:EXIT, _from, :normal}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:EXIT, _from, reason}, state) do
     {:stop, reason, state}
   end
 

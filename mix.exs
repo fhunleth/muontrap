@@ -1,7 +1,7 @@
 defmodule MuonTrap.MixProject do
   use Mix.Project
 
-  @version "1.8.0"
+  @version "2.0.0"
   @source_url "https://github.com/fhunleth/muontrap"
 
   def project do

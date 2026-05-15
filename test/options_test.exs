@@ -140,9 +140,8 @@ defmodule MuonTrap.OptionsTest do
       delay_to_sigkill: 1,
       stdio_window: 1024,
       env: [{"KEY", "VALUE"}, {"KEY2", "VALUE2"}],
-      cgroup_controllers: ["memory", "cpu"],
       cgroup_base: "base",
-      cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}]
+      cgroup: %{memory_max: 268_435_456, cpu_weight: 50}
     ]
 
     for context <- [:daemon, :cmd] do
@@ -158,9 +157,62 @@ defmodule MuonTrap.OptionsTest do
       assert Map.get(options, :delay_to_sigkill) == 1
       assert Map.get(options, :stdio_window) == 1024
       assert Map.get(options, :env) == [{~c"KEY", ~c"VALUE"}, {~c"KEY2", ~c"VALUE2"}]
-      assert Map.get(options, :cgroup_controllers) == ["memory", "cpu"]
       assert Map.get(options, :cgroup_base) == "base"
-      assert Map.get(options, :cgroup_sets) == [{"memory", "memory.limit_in_bytes", "268435456"}]
+      assert Enum.sort(Map.get(options, :cgroup_controllers)) == ["cpu", "memory"]
+
+      assert Enum.sort(Map.get(options, :cgroup_sets)) ==
+               Enum.sort([
+                 {"memory", "memory.max", "268435456"},
+                 {"cpu", "cpu.weight", "50"}
+               ])
+    end
+  end
+
+  test "translates a cgroup map with sentinel and tuple values" do
+    options =
+      Options.validate(:daemon, "echo", [],
+        cgroup_path: "muontrap/abc",
+        cgroup: %{
+          memory_max: 500_000_000,
+          memory_high: :max,
+          cpu_max: {50_000, 100_000},
+          memory_oom_group: true
+        }
+      )
+
+    assert options.cgroup_path == "muontrap/abc"
+    assert Enum.sort(options.cgroup_controllers) == ["cpu", "memory"]
+
+    assert Enum.sort(options.cgroup_sets) ==
+             Enum.sort([
+               {"memory", "memory.max", "500000000"},
+               {"memory", "memory.high", "max"},
+               {"memory", "memory.oom.group", "1"},
+               {"cpu", "cpu.max", "50000 100000"}
+             ])
+  end
+
+  test "rejects unknown cgroup config keys (including a stale :cgroup_path)" do
+    assert_raise ArgumentError, ~r/unknown cgroup config field/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{bogus_key: 1})
+    end
+
+    assert_raise ArgumentError, ~r/unknown cgroup config field.*cgroup_path/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{cgroup_path: "x"})
+    end
+  end
+
+  test "rejects malformed cgroup values" do
+    assert_raise ArgumentError, ~r/invalid value/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{memory_max: -1})
+    end
+
+    assert_raise ArgumentError, ~r/invalid value/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{cpu_max: {-1, 100}})
+    end
+
+    assert_raise ArgumentError, ~r/invalid value/, fn ->
+      Options.validate(:daemon, "echo", [], cgroup: %{memory_max: "500M"})
     end
   end
 

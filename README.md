@@ -16,7 +16,11 @@ Some other features:
 * Set `cgroup` controls like thresholds on memory and CPU utilization
 * Start OS processes as a different user or group
 * Send SIGKILL to processes that aren't responsive to SIGTERM
-* With `cgroups`, ensure that all children of launched processes have been killed too
+* With `cgroups`, get lots of resource usage statistics on the process and all children
+
+Importantly, LLMs have made the world more "exciting" in this area. MuonTrap
+doesn't aim to provide the sandboxing they need. Look at tools like
+[bubblewrap](https://github.com/containers/bubblewrap).
 
 ## TL;DR
 
@@ -25,7 +29,7 @@ Add `muontrap` to your project's `mix.exs` dependency list:
 ```elixir
 def deps do
   [
-    {:muontrap, "~> 1.0"}
+    {:muontrap, "~> 2.0"}
   ]
 end
 ```
@@ -46,26 +50,38 @@ like the following:
 {MuonTrap.Daemon, ["long_running_command", ["arg1", "arg2"], options]}
 ```
 
-Running on Linux and can use cgroups? Then create a new cgroup:
+If you're running on Linux or Nerves with cgroup v2 support enabled, set up a
+parent cgroup once:
 
-```bash
-sudo cgcreate -a $(whoami) -g memory:mycgroup
+```elixir
+# Enable the controllers you want
+File.write!("/sys/fs/cgroup/cgroup.subtree_control", "+cpu +memory +pids")
+
+# Create a parent directory MuonTrap can write under
+File.mkdir_p!("/sys/fs/cgroup/mycgroup")
 ```
+
+If the BEAM isn't running as root, you'll also need to `chown` the parent
+directory so it's writable. See the [Setting up cgroup
+v2](#setting-up-cgroup-v2) section for the full setup.
 
 ```elixir
 {MuonTrap.Daemon,
  [
    "long_running_command",
    ["arg1", "arg2"],
-   [cgroup_controllers: ["memory"], cgroup_base: "mycgroup"]
+   [cgroup_base: "mycgroup", cgroup: %{memory_max: 500_000_000}]
  ]}
 ```
 
-`MuonTrap` will create a cgroup under "mycgroup" to run the
-`"long_running_command"`. If the command fails, it will be restarted. If it
-should no longer be running (like if something else crashed in Elixir and
-supervision needs to clean up) then MuonTrap will kill `"long_running_command"`
-and all of its children.
+`MuonTrap` will create a sub-cgroup under `mycgroup` to run
+`long_running_command`. If the command fails, it will be restarted. If it
+should no longer be running (e.g., something crashed in Elixir and supervision
+is cleaning up), then MuonTrap will kill `long_running_command` and all of its
+children.
+
+> MuonTrap 2.0 dropped cgroup v1. v2 (the unified hierarchy) is commonly
+> available these days. If you're stuck on v1, pin to MuonTrap 1.x.
 
 Want to know more about the motivations for this library? Read on in the
 [Background](#background) section.
@@ -192,69 +208,193 @@ iex> :os.cmd('ps -ef | grep ping') |> IO.puts
 
 ## Containment with cgroups
 
-Even if you don't make use of any cgroup controller features, having your port
-process contained can be useful just to make sure that everything is cleaned
-up on exit including any subprocesses.
+Even if you don't set any controller limits, putting your port process in a
+cgroup is useful by itself: when MuonTrap tears down the cgroup, every
+descendant process inside it dies too — no orphaned children, no escapees.
 
-To set this up, first create a cgroup with appropriate permissions. Any path
-will do; `muontrap` just needs to be able to create a subdirectory underneath it
-for its use. For example:
+### Setting up cgroup v2
+
+MuonTrap requires cgroup v2 (the unified hierarchy at `/sys/fs/cgroup`). Two
+pieces of one-time setup:
+
+**1. Enable the controllers you need at the root.** A controller has to be
+enabled in a cgroup's `cgroup.subtree_control` before it's available to the
+children of that cgroup. Most users will do this once at the root:
 
 ```bash
-sudo cgcreate -a $(whoami) -g memory,cpu:mycgroup
+echo +cpu +memory +pids | sudo tee /sys/fs/cgroup/cgroup.subtree_control
 ```
 
-Be sure to create the group for all of the cgroup controllers that you wish to
-use with `muontrap`. The above example creates it for the `memory` and `cpu`
-controllers.
-
-In Elixir, call `MuonTrap.cmd/3` with the
-cgroup options now. In this case, we'll use the `cpu` controller, but this
-example would work fine with any of the controllers.
+or
 
 ```elixir
-iex>  MuonTrap.cmd("spawning_program", [], cgroup_controllers: ["cpu"], cgroup_base: "mycgroup")
-{"hello\n", 0}
+File.write!("/sys/fs/cgroup/cgroup.subtree_control", "+cpu +memory +pids")
 ```
 
-In this example, `muontrap` runs `spawning_program` in a sub-cgroup under the
-`cpu/mycgroup` group. The cgroup parameters may be modified outside of
-`muontrap` using `cgset` or my accessing the cgroup mountpoint manually.
+This only needs to happen before MuonTrap launches its first cgroup-using
+process — there's no need to wire it into early boot. On Nerves, where the
+BEAM runs as root, calling `File.write!/2` from an application start
+callback works fine.
 
-On any error or if the Erlang VM closes the port or if `spawning_program` exits,
-`muontrap` will kill all OS processes in cgroup. No need to worry about
-random processes accumulating on your system.
+On systemd hosts, systemd manages `cgroup.subtree_control` — usually the
+easiest path is to put your application in a slice with `Delegate=yes`,
+`CPUAccounting=yes`, `MemoryAccounting=yes`, etc., and point `cgroup_base`
+at that slice's directory. See `man 5 systemd.resource-control`.
 
-Note that if you use `cgroup_base`, a temporary cgroup is created for running
-the command. If you want `muontrap` to use a particular cgroup and not create a
-subgroup for the command, use the `:cgroup_path` option. Note that if you
-explicitly specify a cgroup, be careful not to use it for anything else.
-`MuonTrap` assumes that it owns the cgroup and when it needs to kill processes,
-it kills all of them in the cgroup.
+Required kernel options on Nerves: `CONFIG_CGROUPS`, `CONFIG_MEMCG`,
+`CONFIG_CFS_BANDWIDTH`, `CONFIG_CGROUP_PIDS`. Some official Nerves systems
+have this enabled already. If you're on the Raspberry Pi, the bootloader turns
+off memory cgroups by default since there's a ~1% overhead when enabled.
 
-### Limit the memory used by a process
+**2. Create a parent directory MuonTrap can write to.** Any path under
+`/sys/fs/cgroup` works; MuonTrap creates a sub-cgroup beneath it.
 
-Linux's cgroups are very powerful and the examples here only scratch the
-surface. If you'd like to limit an OS process and all of its child processes to
-a maximum amount of memory, you can do that with the `memory` controller:
+```bash
+sudo mkdir -p /sys/fs/cgroup/mycgroup
+sudo chown -R $(whoami) /sys/fs/cgroup/mycgroup
+```
+
+If MuonTrap can't find the controllers it needs, it will exit with a clear
+error and tell you which controller is missing.
+
+### Running a command in a cgroup
 
 ```elixir
-iex>  MuonTrap.cmd("memory_hog", [], cgroup_controllers: ["memory"], cgroup_base: "mycgroup", cgroup_sets: [{"memory", "memory.limit_in_bytes", "268435456"}])
+MuonTrap.cmd("spawning_program", [], cgroup_base: "mycgroup", cgroup: %{cpu_weight: 100})
 ```
 
-That line restricts the total memory used by `memory_hog` to 256 MB.
+MuonTrap creates a temporary sub-cgroup under `mycgroup`, runs the program in
+it, and tears it down on exit. Controllers are enabled automatically based on
+which keys are present in the `:cgroup` map (here, `cpu.*` → the `cpu`
+controller). If you want a fixed path, use `:cgroup_path` instead — but make
+sure nothing else uses that cgroup, since MuonTrap kills everything in it on
+cleanup.
 
-### Limit CPU usage in a port
-
-Limiting the maximum CPU usage is also possible. Two parameters control that
-with the `cpu` controller: `cpu.cfs_period_us` specifies the number of
-microseconds in the scheduling period and `cpu.cfs_quota_us` specifies how many
-of those microseconds can be used. Here's an example call that prevents a
-program from using more than 50% of the CPU:
+### Cap the memory used by a process
 
 ```elixir
-iex>  MuonTrap.cmd("cpu_hog", [], cgroup_controllers: ["cpu"], cgroup_base: "mycgroup", cgroup_sets: [{"cpu", "cpu.cfs_period_us", "100000"}, {"cpu", "cpu.cfs_quota_us", 50000}])
+iex> MuonTrap.cmd("memory_hog", [],
+       cgroup_base: "mycgroup",
+       cgroup: %{memory_max: 268_435_456})
 ```
+
+That restricts total memory to 256 MB. When the limit is hit, the kernel
+invokes the OOM killer; if you also want the *whole cgroup* to be killed
+together (rather than one process at a time), set `memory.oom.group`:
+
+```elixir
+cgroup: %{memory_max: 268_435_456, memory_oom_group: true}
+```
+
+### Cap CPU usage
+
+In v2, CPU bandwidth is controlled by `cpu.max`, expressed as `{quota_us,
+period_us}`. Limit a process to 50% of one CPU:
+
+```elixir
+iex> MuonTrap.cmd("cpu_hog", [],
+       cgroup_base: "mycgroup",
+       cgroup: %{cpu_max: {50_000, 100_000}})
+```
+
+### Cap the number of processes (anti-fork-bomb)
+
+```elixir
+cgroup: %{pids_max: 200}
+```
+
+Useful when you're running something that might fork uncontrollably (a
+compromised browser, an LLM-driven shell, a flaky third-party binary).
+
+### Reading current usage and configuration
+
+`MuonTrap.Daemon.statistics/1` returns a snapshot of the daemon's output
+counters and every readable cgroup stat file in one map (memory usage and
+peak, CPU and memory PSI, OOM-kill counts, `pids.current`, etc.):
+
+```elixir
+%{
+  output_byte_count: 295,
+  memory_current: 552_222_720, memory_peak: 555_364_352,
+  memory_events: %{oom_kill: 0, ...},
+  cpu_stat: %{usage_usec: 867_248_613, ...},
+  cpu_pressure: %{some: %{avg10: 0.0, ...}, full: %{...}},
+  pids_current: 42, pids_peak: 52,
+  ...
+} = MuonTrap.Daemon.statistics(daemon_pid)
+```
+
+`MuonTrap.Daemon.cgroup_config/1` returns the writable side in the same
+shape you'd pass to `:cgroup`, so a running daemon's settings can be
+cloned into a new one:
+
+```elixir
+%{memory_max: 268_435_456,
+  cpu_weight: 100} = MuonTrap.Daemon.cgroup_config(daemon_pid)
+
+"mycgroup/abc"   = MuonTrap.Daemon.cgroup_path(daemon_pid)
+```
+
+For anything outside this set, use the generic interface:
+
+```elixir
+{:ok, raw} = MuonTrap.Daemon.cgget(daemon_pid, "memory.peak")
+:ok        = MuonTrap.Daemon.cgset(daemon_pid, "memory.max", "536870912")
+```
+
+The full list of v2 interface files is in `man 7 cgroups` and the kernel's
+[`Documentation/admin-guide/cgroup-v2.rst`](https://docs.kernel.org/admin-guide/cgroup-v2.html).
+
+## Sandboxing a process (browser, LLM workspace, untrusted binaries)
+
+Cgroups give you **resource limits**, not **isolation**. A process that's been
+capped at 256 MB still has full filesystem, network, and syscall access — if
+it gets compromised, the attacker can read your secrets, exfiltrate over the
+network, and so on. For real isolation you need namespaces (mount, PID, net,
+user, IPC, UTS), seccomp filters, and dropped capabilities.
+
+The simplest way to get that on Linux is [bubblewrap
+(`bwrap`)](https://github.com/containers/bubblewrap) — a small setuid helper
+used by Flatpak. Layer it under MuonTrap: MuonTrap handles lifecycle and
+resource caps, `bwrap` handles isolation.
+
+```elixir
+{MuonTrap.Daemon,
+ [
+   "bwrap",
+   [
+     "--ro-bind", "/usr", "/usr",
+     "--ro-bind", "/lib", "/lib",
+     "--ro-bind", "/lib64", "/lib64",
+     "--proc", "/proc",
+     "--dev", "/dev",
+     "--bind", "/tmp/browser-home", "/home/browser",
+     "--unshare-all",
+     "--die-with-parent",
+     "--",
+     "/usr/bin/my-browser"
+   ],
+   [
+     cgroup_base: "mycgroup",
+     cgroup: %{
+       memory_max: 536_870_912,
+       memory_oom_group: true,
+       cpu_max: {50_000, 100_000},
+       pids_max: 200
+     }
+   ]
+ ]}
+```
+
+`--die-with-parent` ensures `bwrap` (and its child) dies if MuonTrap dies, and
+`--unshare-all` puts the program in fresh namespaces so it can't see other
+processes, your real network stack, or the rest of your filesystem.
+
+For LLM agents that run untrusted code, the same pattern applies, but you
+likely also want filesystem rollback (overlayfs scratch dir) and a tighter
+network policy. MuonTrap handles only the lifecycle + resource caps piece;
+for the rest, look at `bwrap`, [`nsjail`](https://github.com/google/nsjail),
+or container runtimes (Podman, Firecracker microVMs).
 
 ## Supervision
 
@@ -314,16 +454,19 @@ allowed. The default is 10 KB.
 
 ## muontrap development
 
-In order to run the tests, some additional tools need to be installed.
-Specifically the `cgcreate` and `cgget` binaries need to be installed (and
-available on `$PATH`). Typically the package may be called `cgroup-tools` (on
-arch linux you need to install the `libcgroup` aur package).
-
-Then run:
+The cgroup-tagged tests need a `muontrap_test` cgroup with the `cpu` and
+`memory` controllers available:
 
 ```sh
-sudo cgcreate -a $(whoami) -g memory,cpu:muontrap_test
+# One-time root setup (skip if your system or systemd already enables these):
+echo +cpu +memory | sudo tee /sys/fs/cgroup/cgroup.subtree_control
+
+sudo mkdir -p /sys/fs/cgroup/muontrap_test
+sudo chown -R $(whoami) /sys/fs/cgroup/muontrap_test
 ```
+
+To skip cgroup-tagged tests entirely (e.g., on macOS), run
+`mix test --exclude cgroup`.
 
 ## License
 

@@ -114,6 +114,30 @@ defmodule MuonTrapPortTest do
            ]
   end
 
+  test "handles groups" do
+    options = %{cmd: "/bin/echo", args: [], groups: [10, "audio", 100]}
+    port_options = MuonTrap.Port.port_options(options)
+
+    assert Keyword.get(port_options, :args) == [
+             "--groups",
+             "10,audio,100",
+             "--",
+             "/bin/echo"
+           ]
+  end
+
+  test "handles empty groups list" do
+    options = %{cmd: "/bin/echo", args: [], groups: []}
+    port_options = MuonTrap.Port.port_options(options)
+
+    assert Keyword.get(port_options, :args) == [
+             "--groups",
+             "",
+             "--",
+             "/bin/echo"
+           ]
+  end
+
   test "handles gid" do
     options = %{
       cmd: "/bin/echo",

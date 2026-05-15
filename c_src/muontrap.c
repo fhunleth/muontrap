@@ -53,6 +53,7 @@ static struct option long_options[] = {
     {"set", required_argument, 0, 's'},
     {"uid", required_argument, 0, 'u'},
     {"gid", required_argument, 0, 'a'},
+    {"groups", required_argument, 0, 'G'},
     {"stdio-window", required_argument, 0, 'l'},
     {"capture-output", no_argument, 0, 'o'},
     {"capture-stderr", no_argument, 0, 'e'},
@@ -82,6 +83,16 @@ static const char *cgroup_path = NULL;
 static int brutal_kill_wait_ms = 500;
 static uid_t run_as_uid = 0; // 0 means don't set, since we don't support privilege escalation
 static gid_t run_as_gid = 0; // 0 means don't set, since we don't support privilege escalation
+static const char *run_as_user_name = NULL; // set when --uid was a name; triggers initgroups()
+static gid_t run_as_pw_gid = 0;  // primary gid from getpwnam(); used as initgroups()'s extra gid
+
+// Supplementary group handling. NGROUPS_MAX is the kernel limit (typically
+// 65536 on Linux); we cap our own buffer well below that. setgroups() requires
+// privileges, so this must be applied before setuid().
+#define MAX_SUPPLEMENTARY_GROUPS 256
+static int explicit_groups = 0;        // 1 if --groups was given (even with empty list)
+static int num_explicit_groups = 0;
+static gid_t explicit_group_ids[MAX_SUPPLEMENTARY_GROUPS];
 
 static int signal_pipe[2] = { -1, -1};
 static int stdout_pipe[2] = { -1, -1};
@@ -115,6 +126,8 @@ static void usage()
     printf("--capture-stderr-only\n");
     printf("--uid <uid/user> drop privilege to this uid or user\n");
     printf("--gid <gid/group> drop privilege to this gid or group\n");
+    printf("--groups <list> set supplementary groups (comma-separated gids/names;\n");
+    printf("                empty string drops all). Overrides initgroups().\n");
     printf("-- the program to run and its arguments come after this\n");
 }
 
@@ -217,6 +230,22 @@ static int fork_exec(const char *path, char *const *argv)
         // See https://wiki.sei.cmu.edu/confluence/display/c/POS36-C.+Observe+correct+revocation+order+while+relinquishing+privileges
         if (run_as_gid > 0 && setgid(run_as_gid) < 0)
             FATAL("setgid(%d)", run_as_gid);
+
+        // Supplementary groups must be set before setuid() drops root.
+        // Explicit --groups wins; otherwise, if --uid was a username, fall back
+        // to initgroups() so /etc/group memberships apply. A numeric --uid with
+        // no --groups leaves the parent's supplementary groups in place.
+        if (explicit_groups) {
+            if (setgroups(num_explicit_groups, explicit_group_ids) < 0)
+                FATAL("setgroups()");
+        } else if (run_as_user_name) {
+            // Pass the effective primary gid so initgroups() doesn't add the
+            // user's passwd gid as a supplementary group when --gid has
+            // overridden the primary.
+            gid_t init_gid = (run_as_gid > 0) ? run_as_gid : run_as_pw_gid;
+            if (initgroups(run_as_user_name, init_gid) < 0)
+                FATAL("initgroups(%s)", run_as_user_name);
+        }
 
         if (run_as_uid > 0 && setuid(run_as_uid) < 0)
             FATAL("setuid(%d)", run_as_uid);
@@ -734,7 +763,7 @@ int main(int argc, char *argv[])
     int opt;
     char *argv0 = NULL;
     struct controller_info *current_controller = NULL;
-    while ((opt = getopt_long(argc, argv, "a:c:g:hk:s:0:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "a:c:g:hk:s:u:G:0:", long_options, NULL)) != -1) {
         switch (opt) {
         case 'a': // --gid
         {
@@ -814,9 +843,60 @@ int main(int argc, char *argv[])
                 if (!passwd)
                     FATALX("Unknown user '%s'", optarg);
                 run_as_uid = passwd->pw_uid;
+                run_as_pw_gid = passwd->pw_gid;
+                run_as_user_name = optarg;
             }
             if (run_as_uid == 0)
                 FATALX("Setting the user to root or uid 0 is not allowed");
+            break;
+        }
+
+        case 'G': // --groups
+        {
+            explicit_groups = 1;
+            num_explicit_groups = 0;
+            // optarg is a comma-separated list of gids and/or group names.
+            // An empty string means "no supplementary groups."
+            char *list = strdup(optarg);
+            if (!list)
+                FATAL("strdup");
+            char *saveptr = NULL;
+            char *tok = strtok_r(list, ",", &saveptr);
+            while (tok) {
+                if (num_explicit_groups >= MAX_SUPPLEMENTARY_GROUPS)
+                    FATALX("Too many supplementary groups (max %d)", MAX_SUPPLEMENTARY_GROUPS);
+
+                // Treat the token as numeric only if it consists entirely of
+                // digits. This rejects signed values like "-1" that strtoul
+                // would otherwise silently wrap into a valid-looking gid.
+                int is_numeric = (*tok != '\0');
+                for (const char *p = tok; *p; p++) {
+                    if (*p < '0' || *p > '9') {
+                        is_numeric = 0;
+                        break;
+                    }
+                }
+
+                gid_t gid;
+                if (is_numeric) {
+                    errno = 0;
+                    char *endptr;
+                    unsigned long parsed = strtoul(tok, &endptr, 10);
+                    gid = (gid_t)parsed;
+                    if (errno == ERANGE || (unsigned long)gid != parsed)
+                        FATALX("Group id '%s' is out of range", tok);
+                } else {
+                    struct group *grp = getgrnam(tok);
+                    if (!grp)
+                        FATALX("Unknown group '%s'", tok);
+                    gid = grp->gr_gid;
+                }
+                if (gid == 0)
+                    FATALX("Supplementary group id 0 is not allowed");
+                explicit_group_ids[num_explicit_groups++] = gid;
+                tok = strtok_r(NULL, ",", &saveptr);
+            }
+            free(list);
             break;
         }
 

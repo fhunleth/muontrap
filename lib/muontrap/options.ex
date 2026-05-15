@@ -45,6 +45,7 @@ defmodule MuonTrap.Options do
   * `:cgroup_sets`
   * `:uid`
   * `:gid`
+  * `:groups`
   * `:timeout` - `MuonTrap.cmd/3` only
 
   """
@@ -192,6 +193,30 @@ defmodule MuonTrap.Options do
 
   defp validate_option(_any, {:gid, id}, opts) when is_integer(id) or is_binary(id),
     do: Map.put(opts, :gid, id)
+
+  defp validate_option(_any, {:groups, groups}, opts) when is_list(groups) do
+    Enum.each(groups, fn
+      id when is_integer(id) and id > 0 ->
+        :ok
+
+      name when is_binary(name) ->
+        # The C helper splits --groups on commas, so a name containing a comma
+        # would silently expand into multiple entries. An empty name would
+        # likewise produce an empty token.
+        #
+        # Reject gid 0 here as well to keep supplementary group handling
+        # aligned with the existing :gid/--gid safety checks.
+        if name == "" or name == "0" or String.contains?(name, ","),
+          do: raise(ArgumentError, "invalid :groups entry: #{inspect(name)}")
+
+        :ok
+
+      bad ->
+        raise ArgumentError, "invalid :groups entry: #{inspect(bad)}"
+    end)
+
+    Map.put(opts, :groups, groups)
+  end
 
   defp validate_option(:cmd, {:timeout, timeout}, opts) when is_integer(timeout) and timeout > 0,
     do: Map.put(opts, :timeout, timeout)

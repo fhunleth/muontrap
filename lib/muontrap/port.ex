@@ -73,6 +73,7 @@ defmodule MuonTrap.Port do
   defp muontrap_arg({:delay_to_sigkill, delay}), do: ["--delay-to-sigkill", to_string(delay)]
   defp muontrap_arg({:uid, id}), do: ["--uid", to_string(id)]
   defp muontrap_arg({:gid, id}), do: ["--gid", to_string(id)]
+  defp muontrap_arg({:groups, groups}), do: ["--groups", Enum.map_join(groups, ",", &to_string/1)]
   defp muontrap_arg({:arg0, arg0}), do: ["--arg0", arg0]
   defp muontrap_arg({:stdio_window, count}), do: ["--stdio-window", to_string(count)]
   defp muontrap_arg({:stderr_to_stdout, true}), do: ["--capture-stderr"]

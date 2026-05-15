@@ -59,8 +59,14 @@ defmodule MuonTrap do
     * `:cgroup_path` - explicitly specify a path to use. Use `:cgroup_base`, unless you must control the path.
     * `:cgroup_sets` - set a cgroup controller parameter before running the command
     * `:delay_to_sigkill` - milliseconds before sending a SIGKILL to a child process if it doesn't exit with a SIGTERM (default 500 ms)
-    * `:uid` - run the command using the specified uid or username
+    * `:uid` - run the command using the specified uid or username. When a
+      username is given, supplementary groups are loaded from `/etc/group`.
+      When a numeric uid is given, supplementary groups inherit from the
+      parent. See `:groups` to override.
     * `:gid` - run the command using the specified gid or group
+    * `:groups` - explicit list of supplementary group ids or names (as
+      integers or binaries). Pass `[]` to drop all supplementary groups.
+      Overrides default behavior depending on username `:uid` setting.
     * `:timeout` - milliseconds to wait for the command to complete. If the
       command does not exit before the timeout, the return value will contain
       the output up to that point and `:timeout` as the exit status. The child

@@ -163,4 +163,34 @@ defmodule MuonTrap.OptionsTest do
       assert Map.get(options, :cgroup_sets) == [{"memory", "memory.limit_in_bytes", "268435456"}]
     end
   end
+
+  test "accepts :groups list of integers and binaries (including empty)" do
+    options = Options.validate(:cmd, "echo", [], groups: [10, "audio", 100])
+    assert options.groups == [10, "audio", 100]
+
+    options = Options.validate(:cmd, "echo", [], groups: [])
+    assert options.groups == []
+  end
+
+  test "rejects malformed :groups entries" do
+    assert_raise ArgumentError, ~r/invalid :groups entry/, fn ->
+      Options.validate(:cmd, "echo", [], groups: [10, -1])
+    end
+
+    assert_raise ArgumentError, ~r/invalid :groups entry/, fn ->
+      Options.validate(:cmd, "echo", [], groups: [10, :atom])
+    end
+
+    assert_raise ArgumentError, ~r/invalid :groups entry/, fn ->
+      Options.validate(:cmd, "echo", [], groups: [""])
+    end
+
+    assert_raise ArgumentError, ~r/invalid :groups entry/, fn ->
+      Options.validate(:cmd, "echo", [], groups: ["audio,video"])
+    end
+
+    assert_raise ArgumentError, ~r/invalid option :groups/, fn ->
+      Options.validate(:cmd, "echo", [], groups: "audio")
+    end
+  end
 end

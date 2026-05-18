@@ -5,6 +5,10 @@
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/fhunleth/muontrap/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/fhunleth/muontrap/tree/main)
 [![REUSE status](https://api.reuse.software/badge/github.com/fhunleth/muontrap)](https://api.reuse.software/info/github.com/fhunleth/muontrap)
 
+*This is the v1 maintenance branch. The v2 releases replace cgroup v1 support
+with v2. Non-cgroup APIs remain the same.  See the [muontrap main
+branch](https://github.com/fhunleth/muontrap/)*
+
 Keep programs, daemons, and applications launched from Erlang and Elixir
 contained and well-behaved. This lightweight library kills OS processes if the
 Elixir process running them crashes and if you're running on Linux, it can use

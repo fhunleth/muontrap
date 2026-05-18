@@ -68,6 +68,35 @@ jobs:
             - _build
             - deps
 
+  cgroup-test:
+    machine:
+      image: ubuntu-2404:current
+    working_directory: ~/repo
+    environment:
+      LC_ALL: C.UTF-8
+    steps:
+      - checkout
+      - run:
+          name: Verify host is running cgroup v2
+          command: |
+            mount | grep -q 'cgroup2 on /sys/fs/cgroup' \
+              || (echo "Host is not on cgroup v2"; exit 1)
+      - run:
+          name: Install Erlang and Elixir
+          command: |
+            sudo apt-get update -qq
+            sudo apt-get install -y erlang elixir build-essential
+            mix local.hex --force
+            mix local.rebar --force
+      - run:
+          name: Create the muontrap_test cgroup
+          command: |
+            sudo mkdir -p /sys/fs/cgroup/muontrap_test
+            sudo chown -R "$(whoami)" /sys/fs/cgroup/muontrap_test
+            echo +cpu +memory | sudo tee /sys/fs/cgroup/cgroup.subtree_control
+      - run: mix deps.get
+      - run: mix test --only cgroup
+
 workflows:
   checks:
     jobs:
@@ -80,3 +109,4 @@ workflows:
           matrix:
             parameters:
               tag: *tags
+      - cgroup-test

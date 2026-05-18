@@ -96,6 +96,7 @@ jobs:
             echo +cpu +memory | sudo tee /sys/fs/cgroup/cgroup.subtree_control
       - run: mix deps.get
       - run: mix test --only cgroup
+      - run: MIX_ENV=test mix coveralls.circle
 
 workflows:
   checks:

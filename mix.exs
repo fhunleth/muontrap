@@ -25,7 +25,8 @@ defmodule MuonTrap.MixProject do
       dialyzer: [
         flags: [:missing_return, :extra_return, :unmatched_returns, :error_handling, :underspecs]
       ],
-      package: package()
+      package: package(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -37,7 +38,18 @@ defmodule MuonTrap.MixProject do
   end
 
   def cli do
-    [preferred_envs: %{docs: :docs, "hex.publish": :docs, "hex.build": :docs}]
+    [
+      preferred_envs: %{
+        docs: :docs,
+        "hex.publish": :docs,
+        "hex.build": :docs,
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.circle": :test
+      }
+    ]
   end
 
   defp deps() do
@@ -45,7 +57,8 @@ defmodule MuonTrap.MixProject do
       {:elixir_make, "~> 0.6", runtime: false},
       {:ex_doc, "~> 0.19", only: :docs, runtime: false},
       {:dialyxir, "~> 1.2", only: :dev, runtime: false},
-      {:credo, "~> 1.5", only: :dev, runtime: false}
+      {:credo, "~> 1.5", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.17", only: :test, runtime: false}
     ]
   end
 

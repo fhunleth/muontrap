@@ -2,8 +2,9 @@ version = 1
 
 [[annotations]]
 path = [
- "NOTICE",
- "mix.lock"
+ "coveralls.json",
+ "mix.lock",
+ "NOTICE"
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "None"

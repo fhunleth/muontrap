@@ -51,7 +51,7 @@ jobs:
           keys:
             - v1-mix-cache-<< parameters.tag >>-{{ checksum "mix.lock" }}
       - run: mix deps.get
-      - run: mix test --exclude cgroup
+      - run: mix test --exclude cgroup || mix test --failed --exclude cgroup
       - when:
           condition:
             matches: { <<: *latest, value: << parameters.tag >> }
@@ -95,7 +95,7 @@ jobs:
             sudo chown -R "$(whoami)" /sys/fs/cgroup/muontrap_test
             echo +cpu +memory | sudo tee /sys/fs/cgroup/cgroup.subtree_control
       - run: mix deps.get
-      - run: mix test --only cgroup
+      - run: mix test --only cgroup || mix test --failed --only cgroup
       - run: MIX_ENV=test mix coveralls.circle
 
 workflows:

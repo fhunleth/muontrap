@@ -1,3 +1,11 @@
+<!--
+  SPDX-FileCopyrightText: 2018 Frank Hunleth
+  SPDX-FileCopyrightText: 2019 Jason Axelson
+  SPDX-FileCopyrightText: 2023 Jon Carstens
+  SPDX-FileCopyrightText: 2025 Rich Morin
+  SPDX-License-Identifier: CC-BY-4.0
+-->
+
 # MuonTrap
 
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)

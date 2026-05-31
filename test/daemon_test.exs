@@ -400,7 +400,7 @@ defmodule DaemonTest do
 
         os_pid = Daemon.os_pid(pid)
 
-        assert_receive {:DOWN, ^ref, :process, _object, :error_exit_status}
+        assert_receive {:DOWN, ^ref, :process, _object, :error_exit_status}, 1000
         assert_os_pid_exited(os_pid)
 
         :ok = stop_supervised(:test_daemon)
@@ -436,7 +436,7 @@ defmodule DaemonTest do
 
         os_pid = Daemon.os_pid(pid)
 
-        assert_receive {:DOWN, ^ref, :process, _object, :error_exit_sigusr1}
+        assert_receive {:DOWN, ^ref, :process, _object, :error_exit_sigusr1}, 1000
         assert_os_pid_exited(os_pid)
 
         :ok = stop_supervised(:test_daemon)

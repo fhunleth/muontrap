@@ -7,12 +7,14 @@
 
 ## v2.0.0-rc.0
 
-This release drops cgroup v1 support. cgroup v2 is the default on every
-mainstream Linux distribution since 2021–2022 and is supported by Nerves.
+This release adds support for cgroup v2. This replaces cgroup v1 support, which
+lacks functionality and is becoming less widely supported. While Nerves is the
+current development platform for cgroup support, using cgroups on desktop Linux
+works but may not be ergonomic. PRs in this area are welcome.
 
 If you don't use cgroups, this update is not breaking for you. Library authors
-are encouraged to allow both MuonTrap v1 and v2 to be used if your library falls
-into this category.
+are encouraged to allow both MuonTrap v1 and v2 if your library falls into this
+category.
 
 * Breaking changes
   * Cgroup v1 support removed

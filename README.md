@@ -9,7 +9,7 @@
 # MuonTrap
 
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
-[![API docs](https://img.shields.io/hexpm/v/muontrap.svg?label=hexdocs "API docs")](https://hexdocs.pm/muontrap/MuonTrap.html)
+[![API docs](https://img.shields.io/hexpm/v/muontrap.svg?label=hexdocs "API docs")](https://muontrap.hexdocs.pm/MuonTrap.html)
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/fhunleth/muontrap/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/fhunleth/muontrap/tree/main)
 [![Coverage Status](https://coveralls.io/repos/github/fhunleth/muontrap/badge.svg)](https://coveralls.io/github/fhunleth/muontrap)
 [![REUSE status](https://api.reuse.software/badge/github.com/fhunleth/muontrap)](https://api.reuse.software/info/github.com/fhunleth/muontrap)
@@ -48,7 +48,7 @@ end
 ```
 
 Run a command similar to
-[`System.cmd/3`](https://hexdocs.pm/elixir/System.html#cmd/3):
+[`System.cmd/3`](https://elixir.hexdocs.pm/System.html#cmd/3):
 
 ```elixir
 iex>  MuonTrap.cmd("echo", ["hello"])
@@ -56,7 +56,7 @@ iex>  MuonTrap.cmd("echo", ["hello"])
 ```
 
 Attach a long running process to a supervision tree using a
-[child_spec](https://hexdocs.pm/elixir/Supervisor.html#module-child-specification)
+[child_spec](https://elixir.hexdocs.pm/Supervisor.html#module-child-specification)
 like the following:
 
 ```elixir

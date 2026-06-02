@@ -50,7 +50,7 @@ defmodule MuonTrap.Options do
   """
   @type t() :: map()
 
-  # See https://hexdocs.pm/logger/Logger.html#module-levels
+  # See https://logger.hexdocs.pm/Logger.html#module-levels
   # Include `:warn` for older Elixir versions
   @log_levels [:emergency, :alert, :critical, :error, :warning, :warn, :notice, :info, :debug]
 

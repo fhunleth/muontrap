@@ -48,6 +48,12 @@ defmodule MuonTrap.Port do
       {^port, {:exit_status, status}} ->
         {acc, status}
 
+      # Port died abnormally (only received when the caller traps exits). No
+      # :exit_status will arrive, so exit with the port's reason rather than
+      # wait forever.
+      {:EXIT, ^port, reason} when reason != :normal ->
+        exit(reason)
+
       ^timeout_message ->
         Port.close(port)
         {acc, :timeout}

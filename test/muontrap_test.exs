@@ -122,6 +122,27 @@ defmodule MuonTrapTest do
     assert length(split) == 1001
   end
 
+  test "cmd/3 doesn't kill concurrent callers with :epipe" do
+    # Exiting while acks for captured output were in flight used to kill the
+    # caller with :epipe. The race needs scheduler load to trigger, so run
+    # many commands concurrently.
+    refs =
+      for _ <- 1..200 do
+        {_pid, ref} =
+          spawn_monitor(fn ->
+            exit(MuonTrap.cmd(test_path("print_and_exit.test"), []))
+          end)
+
+        ref
+      end
+
+    for ref <- refs do
+      assert_receive {:DOWN, ^ref, :process, _pid, result}, 30_000
+      assert {output, 0} = result
+      assert is_binary(output)
+    end
+  end
+
   test "cmd/3 with timeout" do
     opts = [timeout: 250]
 

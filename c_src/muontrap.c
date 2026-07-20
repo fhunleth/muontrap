@@ -100,6 +100,7 @@ static int stdout_pipe[2] = { -1, -1};
 static int stderr_pipe[2] = { -1, -1};
 
 #define DEFAULT_STDIO_WINDOW 10240 // Allow up to 10 KB out to Elixir at a time
+#define ACK_WAIT_TIMEOUT_MS 10000 // Max time to wait for stdio acks before exiting
 static int stdio_bytes_max = DEFAULT_STDIO_WINDOW;
 static int stdio_bytes_avail = DEFAULT_STDIO_WINDOW;
 static int capture_output = 0; // Don't capture output by default
@@ -718,6 +719,65 @@ static int process_stdio(int from_fd)
 }
 #endif
 
+// Process acknowledgments from Erlang for captured output. Returns -1 on
+// EOF, a read error, or more acks than bytes sent.
+static int process_acks()
+{
+    uint8_t acknowledgments[32];
+    ssize_t amt = read(STDIN_FILENO, acknowledgments, sizeof(acknowledgments));
+    if (amt > 0) {
+        // More than one acknowledgment may have come in, so process them all.
+        // NOTE: each ack is 1+its_value
+        int total_acks = amt;
+        for (ssize_t i = 0; i < amt; i++)
+            total_acks += acknowledgments[i];
+
+        stdio_bytes_avail += total_acks;
+        if (stdio_bytes_avail > stdio_bytes_max) {
+            WARNX("Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
+            return -1;
+        }
+    } else if (amt == 0) {
+        INFO("eof on STDIN_FILENO");
+        return -1;
+    } else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+        INFO("read STDIN_FILENO error: %s", strerror(errno));
+        return -1;
+    }
+
+    return 0;
+}
+
+// Wait for Erlang to acknowledge all captured output before exiting. Exiting
+// with acks in flight makes the Erlang-side write fail with EPIPE, and the
+// port kills the process that ran the command with reason :epipe.
+static void wait_for_acks()
+{
+    struct pollfd fds[1];
+    fds[0].fd = STDIN_FILENO;
+    fds[0].events = POLLIN;
+
+    while (stdio_bytes_avail < stdio_bytes_max) {
+        int rc = poll(fds, 1, ACK_WAIT_TIMEOUT_MS);
+        if (rc < 0 && errno == EINTR)
+            continue;
+
+        if (rc <= 0) {
+            // Erlang should have acknowledged by now, so give up rather than hang.
+            WARNX("gave up waiting for acks (%d/%d)", (int) stdio_bytes_avail, (int) stdio_bytes_max);
+            return;
+        }
+
+        if (fds[0].revents & POLLHUP) {
+            // Erlang closed the port, so no more acks are coming.
+            return;
+        }
+
+        if (process_acks() < 0)
+            return;
+    }
+}
+
 static int child_wait_loop(pid_t child_pid, int *still_running)
 {
     struct pollfd fds[4];
@@ -762,24 +822,8 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
         }
 
         if (fds[0].revents & POLLIN) {
-            uint8_t acknowledgments[32];
-            ssize_t amt = read(STDIN_FILENO, acknowledgments, sizeof(acknowledgments));
-            if (amt >= 0) {
-                // More than one acknowledgment may have come in, so process them all.
-                // NOTE: each ack is 1+its_value
-                int total_acks = amt;
-                for (ssize_t i = 0; i < amt; i++)
-                    total_acks += acknowledgments[i];
-
-                stdio_bytes_avail += total_acks;
-                if (stdio_bytes_avail > stdio_bytes_max) {
-                    WARNX("Too many acks %d/%d, got %d", (int) stdio_bytes_avail, (int) stdio_bytes_max, total_acks);
-                    return EXIT_FAILURE;
-                }
-            } else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
-                INFO("read STDIN_FILENO error: %s", strerror(errno));
+            if (process_acks() < 0)
                 return EXIT_FAILURE;
-            }
         }
 
         if (poll_num > 2 && fds[2].revents) {
@@ -1078,5 +1122,6 @@ int main(int argc, char *argv[])
     }
     disable_signal_handlers();
 
+    wait_for_acks();
     exit(exit_status);
 }

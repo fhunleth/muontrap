@@ -161,21 +161,21 @@ defmodule MuonTrapTest do
   # Test adapted from https://github.com/elixir-lang/elixir/blob/v1.15.0/lib/elixir/test/elixir/system_test.exs#L121
   @echo "echo-elixir-test"
   @tag :tmp_dir
-  test "cmd/2 with absolute and relative paths", config do
+  test "cmd/3 with absolute and relative paths", config do
     echo = Path.join(config.tmp_dir, @echo)
     File.mkdir_p!(Path.dirname(echo))
-    File.ln_s!(System.find_executable("echo"), echo)
+    File.ln_s!(System.find_executable("sh"), echo)
 
     File.cd!(Path.dirname(echo), fn ->
       # There is a bug in OTP where find_executable is finding
       # entries on the current directory. If this is the case,
       # we should avoid the assertion below.
       if !System.find_executable(@echo) do
-        assert :enoent = catch_error(MuonTrap.cmd(@echo, ["hello"]))
+        assert :enoent = catch_error(MuonTrap.cmd(@echo, ["-c", "echo hello"]))
       end
 
       assert {"hello\n", 0} =
-               MuonTrap.cmd(Path.join(File.cwd!(), @echo), ["hello"], [{:arg0, "echo"}])
+               MuonTrap.cmd(Path.join(File.cwd!(), @echo), ["-c", "echo hello"], [{:arg0, "sh"}])
     end)
   end
 

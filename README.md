@@ -42,7 +42,9 @@ Add `muontrap` to your project's `mix.exs` dependency list:
 ```elixir
 def deps do
   [
-    {:muontrap, "~> 2.0.0-rc.0"}
+    {:muontrap, "~> 1.8"}
+    # Or try the mostly backwards compatible 2.0.0 release candidate
+    # {:muontrap, "~> 2.0.0-rc.1"}
   ]
 end
 ```

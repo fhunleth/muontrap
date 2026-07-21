@@ -5,6 +5,13 @@
 
 # Changelog
 
+## v2.0.0-rc.1
+
+* Fixes
+  * Fix `:epipe` failures for commands that produce output. (Thanks @dcalvo!)
+  * Fix test failures on Ubuntu 26.04 and expand CI tests to cover Ubuntu
+    release and macOS versions. Previously CI only verified Alpine Linux.
+
 ## v2.0.0-rc.0
 
 This release adds support for cgroup v2. This replaces cgroup v1 support, which

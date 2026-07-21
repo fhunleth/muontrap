@@ -30,6 +30,12 @@ ubuntu_tags: &ubuntu_tags
     1.20.2-erlang-29.0.3-ubuntu-jammy-20260627,
   ]
 
+macos_xcode_versions: &macos_xcode_versions
+  [
+    "26.6",
+    "16.4.0"
+  ]
+
 jobs:
   check-license:
     docker:
@@ -128,6 +134,27 @@ jobs:
       - run: mix deps.get
       - run: mix test --exclude cgroup || mix test --failed --exclude cgroup
 
+  macos-test:
+    parameters:
+      xcode:
+        type: string
+    macos:
+      xcode: << parameters.xcode >>
+    resource_class: macos.m1.medium.gen1
+    working_directory: ~/repo
+    environment:
+      LC_ALL: C.UTF-8
+    steps:
+      - checkout
+      - run:
+          name: Install Elixir
+          command: |
+            brew install elixir
+            mix local.hex --force
+            mix local.rebar --force
+      - run: mix deps.get
+      - run: mix test --exclude cgroup || mix test --failed --exclude cgroup
+
 workflows:
   checks:
     jobs:
@@ -146,3 +173,8 @@ workflows:
           matrix:
             parameters:
               tag: *ubuntu_tags
+      - macos-test:
+          name: macos-xcode-<< matrix.xcode >>
+          matrix:
+            parameters:
+              xcode: *macos_xcode_versions

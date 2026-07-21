@@ -7,6 +7,7 @@ version: 2.1
 latest: &latest
   pattern: "^1.20.*-erlang-29.*$"
 
+# Test across Elixir versions
 tags: &tags
   [
     1.20.2-erlang-29.0.3-alpine-3.24.1,
@@ -19,6 +20,14 @@ tags: &tags
     1.13.4-erlang-24.3.4-alpine-3.15.3,
     1.12.3-erlang-24.3.4-alpine-3.15.3,
     1.11.4-erlang-23.3.4.13-alpine-3.15.3,
+  ]
+
+# Test across Ubuntu versions
+ubuntu_tags: &ubuntu_tags
+  [
+    1.20.2-erlang-29.0.3-ubuntu-resolute-20260707,
+    1.20.2-erlang-29.0.3-ubuntu-noble-20260610,
+    1.20.2-erlang-29.0.3-ubuntu-jammy-20260627,
   ]
 
 jobs:
@@ -99,6 +108,26 @@ jobs:
       - run: mix test --only cgroup || mix test --failed --only cgroup
       - run: MIX_ENV=test mix coveralls.circle
 
+  ubuntu-build-test:
+    parameters:
+      tag:
+        type: string
+    docker:
+      - image: hexpm/elixir:<< parameters.tag >>
+    working_directory: ~/repo
+    environment:
+      LC_ALL: C.UTF-8
+    steps:
+      - run:
+          name: Install system dependencies
+          command: |
+            apt-get update -qq
+            apt-get install -y build-essential procps libsctp1 ca-certificates
+      - checkout
+      - run: mix local.hex --force
+      - run: mix deps.get
+      - run: mix test --exclude cgroup || mix test --failed --exclude cgroup
+
 workflows:
   checks:
     jobs:
@@ -112,3 +141,8 @@ workflows:
             parameters:
               tag: *tags
       - cgroup-test
+      - ubuntu-build-test:
+          name: << matrix.tag >>
+          matrix:
+            parameters:
+              tag: *ubuntu_tags

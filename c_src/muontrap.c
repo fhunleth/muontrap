@@ -101,6 +101,7 @@ static int stderr_pipe[2] = { -1, -1};
 
 #define DEFAULT_STDIO_WINDOW 10240 // Allow up to 10 KB out to Elixir at a time
 #define ACK_WAIT_TIMEOUT_MS 10000 // Max time to wait for stdio acks before exiting
+#define DRAIN_TIMEOUT_MS 10000 // Max time to spend draining stdio after the child exits
 static int stdio_bytes_max = DEFAULT_STDIO_WINDOW;
 static int stdio_bytes_avail = DEFAULT_STDIO_WINDOW;
 static int capture_output = 0; // Don't capture output by default
@@ -778,6 +779,52 @@ static void wait_for_acks()
     }
 }
 
+// Forward output that the child left in the pipes.
+//
+// process_stdio() only moves as much as the flow control window allows, and
+// child_wait_loop() stops polling the output fds once that window is empty, so
+// returning when the child is reaped drops whatever is still queued. Everything
+// the child wrote is in the pipe by now, so a zero-timeout poll is enough to
+// recognize an empty one and this costs nothing when it already is. The timeout
+// only applies if something that inherited the pipe outlives the child and
+// keeps writing, since draining forever would hold up cleanup.
+static void drain_stdio()
+{
+    int drain_fds[2];
+    int num_fds = 0;
+
+    if (capture_stderr_only) {
+        drain_fds[num_fds++] = stderr_pipe[0];
+    } else if (capture_output) {
+        drain_fds[num_fds++] = stdout_pipe[0];
+        if (capture_stderr)
+            drain_fds[num_fds++] = stderr_pipe[0];
+    }
+
+    int end_timeout_us = microsecs() + (1000 * DRAIN_TIMEOUT_MS);
+    struct pollfd fds[1];
+    fds[0].events = POLLIN;
+
+    for (int i = 0; i < num_fds; i++) {
+        fds[0].fd = drain_fds[i];
+
+        while (microsecs() - end_timeout_us < 0) {
+            int rc = poll(fds, 1, 0);
+            if (rc < 0 && errno == EINTR)
+                continue;
+
+            if (rc <= 0)
+                break;
+
+            if (stdio_bytes_avail <= 0)
+                wait_for_acks();
+
+            if (stdio_bytes_avail <= 0 || process_stdio(drain_fds[i]) < 0)
+                return;
+        }
+    }
+}
+
 static int child_wait_loop(pid_t child_pid, int *still_running)
 {
     struct pollfd fds[4];
@@ -865,6 +912,8 @@ static int child_wait_loop(pid_t child_pid, int *still_running)
                         INFO("child terminated with unexpected status: %d", status);
                         exit_status = EXIT_FAILURE;
                     }
+
+                    drain_stdio();
                     return exit_status;
                 } else {
                     INFO("something else caused sigchild: pid=%d, status=%d. our child=%d", dying_pid, status, child_pid);

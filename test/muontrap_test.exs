@@ -122,6 +122,20 @@ defmodule MuonTrapTest do
     assert length(split) == 1001
   end
 
+  test "cmd/3 captures all output from a command that exits immediately" do
+    # Whatever the flow control window hasn't forwarded yet is still in the pipe
+    # when the child is reaped. Repeat, since losing it depends on how the exit
+    # races the output.
+    for opts <- [[], [stdio_window: 63]], _ <- 1..20 do
+      {output, 0} = MuonTrap.cmd(test_path("print_and_exit.test"), [], opts)
+
+      split =
+        String.split(output, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+      assert length(split) == 1001
+    end
+  end
+
   test "cmd/3 doesn't kill concurrent callers with :epipe" do
     # Exiting while acks for captured output were in flight used to kill the
     # caller with :epipe. The race needs scheduler load to trigger, so run

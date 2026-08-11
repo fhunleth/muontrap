@@ -48,11 +48,12 @@ defmodule MuonTrap.Port do
       {^port, {:exit_status, status}} ->
         {acc, status}
 
-      # Port died abnormally (only received when the caller traps exits). No
-      # :exit_status will arrive, so exit with the port's reason rather than
-      # wait forever.
+      # When the caller is trapping exits and the port abnormally dies, the
+      # :exit_status message won't be received. This is a highly unlikely
+      # condition, so raise an ErlangError like other System.cmd/3  exceptional
+      # conditions.
       {:EXIT, ^port, reason} when reason != :normal ->
-        exit(reason)
+        :erlang.error(reason)
 
       ^timeout_message ->
         try do

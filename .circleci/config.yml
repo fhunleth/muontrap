@@ -149,6 +149,7 @@ jobs:
       - run:
           name: Install Elixir
           command: |
+            brew update
             brew install elixir
             mix local.hex --force
             mix local.rebar --force

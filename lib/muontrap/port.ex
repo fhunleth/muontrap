@@ -55,7 +55,12 @@ defmodule MuonTrap.Port do
         exit(reason)
 
       ^timeout_message ->
-        Port.close(port)
+        try do
+          Port.close(port)
+        rescue
+          ArgumentError -> :ok
+        end
+
         {acc, :timeout}
     end
   end

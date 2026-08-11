@@ -128,19 +128,21 @@ defmodule MuonTrapTest do
     # many commands concurrently.
     refs =
       for _ <- 1..200 do
-        {_pid, ref} =
-          spawn_monitor(fn ->
-            exit(MuonTrap.cmd(test_path("print_and_exit.test"), []))
-          end)
-
+        {_pid, ref} = spawn_monitor(fn -> exit(run_cmd()) end)
         ref
       end
 
     for ref <- refs do
       assert_receive {:DOWN, ^ref, :process, _pid, result}, 30_000
-      assert {output, 0} = result
+      assert {output, 0} = result, "hello!!!"
       assert is_binary(output)
     end
+  end
+
+  defp run_cmd() do
+    MuonTrap.cmd(test_path("print_and_exit.test"), [])
+  rescue
+    ErlangError -> {"Need more file handles. Run ulimit -n 512", 1}
   end
 
   test "cmd/3 with timeout" do

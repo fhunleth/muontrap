@@ -5,6 +5,12 @@
 
 # Changelog
 
+## v2.0.0-rc.2
+
+* Fixes
+  * Fix truncated output when a command exits (Thanks @dcalvo)
+  * Gracefully handle an already-closed port (Thanks @bencoppock)
+
 ## v2.0.0-rc.1
 
 * Fixes

@@ -5,20 +5,7 @@
 
 # Changelog
 
-## v2.0.0-rc.2
-
-* Fixes
-  * Fix truncated output when a command exits (Thanks @dcalvo)
-  * Gracefully handle an already-closed port (Thanks @bencoppock)
-
-## v2.0.0-rc.1
-
-* Fixes
-  * Fix `:epipe` failures for commands that produce output. (Thanks @dcalvo!)
-  * Fix test failures on Ubuntu 26.04 and expand CI tests to cover Ubuntu
-    release and macOS versions. Previously CI only verified Alpine Linux.
-
-## v2.0.0-rc.0
+## v2.0.0
 
 This release adds support for cgroup v2. This replaces cgroup v1 support, which
 lacks functionality and is becoming less widely supported. While Nerves is the
@@ -66,6 +53,13 @@ cgroup: %{
   cpu_max: {50_000, 100_000}
 }
 ```
+
+* Fixes
+  * Fix truncated output when a command exits (Thanks @dcalvo)
+  * Gracefully handle an already-closed port (Thanks @bencoppock)
+  * Fix `:epipe` failures for commands that produce output. (Thanks @dcalvo!)
+  * Fix test failures on Ubuntu 26.04 and expand CI tests to cover Ubuntu
+    releases and macOS versions. Previously CI only verified Alpine Linux.
 
 ## v1.8.0
 

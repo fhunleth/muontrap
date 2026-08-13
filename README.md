@@ -14,9 +14,10 @@
 [![Coverage Status](https://coveralls.io/repos/github/fhunleth/muontrap/badge.svg)](https://coveralls.io/github/fhunleth/muontrap)
 [![REUSE status](https://api.reuse.software/badge/github.com/fhunleth/muontrap)](https://api.reuse.software/info/github.com/fhunleth/muontrap)
 
-*This is a v2 branch. The v2 releases replace MuonTrap's cgroup v1 support with
-v2. Non-cgroup APIs remain compatible with v1. See the [muontrap maint-v1.x
-branch](https://github.com/fhunleth/muontrap/tree/maint-v1.x) for v1.*
+*If you're using MuonTrap v1, please try updating to v2. If you're not using
+Linux cgroups, you probably won't need to change your code. See the
+[CHANGELOG.md](CHANGELOG.md) for details. MuonTrap v1 is maintained in the
+[maint-v1.x branch](https://github.com/fhunleth/muontrap/tree/maint-v1.x).*
 
 Keep programs, daemons, and applications launched from Erlang and Elixir
 contained and well-behaved. This lightweight library kills OS processes if the
@@ -42,9 +43,7 @@ Add `muontrap` to your project's `mix.exs` dependency list:
 ```elixir
 def deps do
   [
-    {:muontrap, "~> 2.0.0-rc.1"}
-    # Or to not use the 2.0.0 release candidate
-    # {:muontrap, "~> 1.8"}
+    {:muontrap, "~> 2.0"}
   ]
 end
 ```

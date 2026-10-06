@@ -5,6 +5,12 @@
 
 # Changelog
 
+## v2.0.1
+
+* Fixes
+  * Fix build failures when using parallel make (`MAKEFLAGS=-j4`)
+  * Fix Argus warning
+
 ## v2.0.0
 
 This release adds support for cgroup v2. This replaces cgroup v1 support, which

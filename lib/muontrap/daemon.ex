@@ -267,8 +267,17 @@ defmodule MuonTrap.Daemon do
 
     case Map.get(options, :wait_for) do
       nil -> {:ok, start_port(state)}
-      fun -> {:ok, %{state | wait_task: Task.async(fun)}}
+      fun -> {:ok, %{state | wait_task: start_wait_task(fun)}}
     end
+  end
+
+  defp start_wait_task(fun) do
+    daemon = self()
+
+    spawn_link(fn ->
+      fun.()
+      send(daemon, {:wait_complete, self()})
+    end)
   end
 
   defp start_port(state) do
@@ -359,8 +368,7 @@ defmodule MuonTrap.Daemon do
   end
 
   @impl GenServer
-  def handle_info({ref, _result}, %__MODULE__{wait_task: %Task{ref: ref}} = state) do
-    Process.demonitor(ref, [:flush])
+  def handle_info({:wait_complete, pid}, %__MODULE__{wait_task: pid} = state) do
     {:noreply, start_port(%{state | wait_task: nil})}
   end
 

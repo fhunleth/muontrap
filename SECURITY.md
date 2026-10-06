@@ -6,7 +6,7 @@
 
 # Security Policy
 
-The fwup project takes security seriously. Thank you for helping keep fwup and its users safe.
+The muontrap project takes security seriously. Thank you for helping keep muontrap and its users safe.
 
 ## Reporting a Vulnerability
 

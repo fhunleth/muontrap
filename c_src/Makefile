@@ -38,6 +38,9 @@ all: install
 
 install: $(PREFIX) $(BUILD) $(MUONTRAP)
 
+$(OBJ): | $(BUILD)
+$(NIF): | $(PREFIX)
+
 $(OBJ): Makefile
 
 $(BUILD)/%.o: %.c

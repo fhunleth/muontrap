@@ -53,6 +53,7 @@ jobs:
     working_directory: ~/repo
     environment:
       LC_ALL: C.UTF-8
+      MAKEFLAGS: -j4
     steps:
       - run:
           name: Install system dependencies

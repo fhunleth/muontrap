@@ -10,6 +10,7 @@
 
 [![Hex version](https://img.shields.io/hexpm/v/muontrap.svg "Hex version")](https://hex.pm/packages/muontrap)
 [![API docs](https://img.shields.io/hexpm/v/muontrap.svg?label=hexdocs "API docs")](https://muontrap.hexdocs.pm/MuonTrap.html)
+[![Nerves compatibility](https://compatibility.nerves-project.org/badge/muontrap.svg)](https://compatibility.nerves-project.org/packages/muontrap)
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/fhunleth/muontrap/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/fhunleth/muontrap/tree/main)
 [![Coverage Status](https://coveralls.io/repos/github/fhunleth/muontrap/badge.svg)](https://coveralls.io/github/fhunleth/muontrap)
 [![REUSE status](https://api.reuse.software/badge/github.com/fhunleth/muontrap)](https://api.reuse.software/info/github.com/fhunleth/muontrap)

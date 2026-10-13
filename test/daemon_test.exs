@@ -192,7 +192,7 @@ defmodule DaemonTest do
         start_supervised(
           daemon_spec(
             "echo",
-            ["-n", "hello"],
+            ["hello"],
             log_output: :error,
             logger_metadata: [foo: :bar]
           )
@@ -210,7 +210,7 @@ defmodule DaemonTest do
     log_output = capture_log(logger_opts, fun)
     assert log_output =~ "foo=bar"
     assert log_output =~ "muontrap_cmd=echo"
-    assert log_output =~ "muontrap_args=-n hello"
+    assert log_output =~ "muontrap_args=hello"
   end
 
   test "daemon supports custom logger (captured function)" do
